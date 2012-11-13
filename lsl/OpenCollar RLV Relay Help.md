@@ -35,7 +35,7 @@ OpenCollar includes such a relay. The relay included in OpenCollar has a few par
 2. User help
 ============
 
-1.1. Menu buttons
+2.1. Menu buttons
 -----------------
 
 (Don't be surprised if some of these buttons aren't always displayed, since, depending on the context, irrelevant ones are automatically hidden.)
@@ -85,7 +85,7 @@ In the request dialog, which will pop up in Ask mode when an RLV source tries to
 * Ban User: same as No, but adds the avatar using the object to the blacklist.
 
 
-1.2. Chat commands:
+2.2. Chat commands:
 -------------------
 
 * [initials]showrestrictions: shows the list of restrictions to which the wearer is subject, and the devices issuing these.
@@ -112,7 +112,7 @@ In the request dialog, which will pop up in Ask mode when an RLV source tries to
 3. Technical information for RLV scripters
 ==========================================
 
-2.1. Features and specifications
+3.1. Features and specifications
 --------------------------------
 
 As an ORG (Open Relay Group) relay, this relay conforms to
@@ -127,7 +127,7 @@ In particular, this means that this relay will understand relay commands using a
 
 Also, through the x-tension who, this relay understands the meta-command !x-who, which allows RLV sources to specify who (which avatar) is now using the source to grab the relay. This information is reported in the Ask dialog prompt and can be used by the wearer to decide whether to accept being locked, and also maybe to blacklist or whitelist the avatar using the source.
 
-2.2. Caveats
+3.2. Caveats
 ------------
 
 This script uses a lot of memory, and even more when it has to decompose and analyze relay commands. Moreover, this relay manages several RLV sources (an arbitrary number of them) from only two scripts, which makes things even worse. We took great care in optimizing it the best we could, but it is not impossible that a stack-heap collision will still occur. If that happens:
@@ -140,7 +140,7 @@ Also, due to the way RLV works, having several RLV sources managing from a singl
 
 Some other bugs might arise, related to contradictory commands, restrictions and exceptions from different sources. This category of bugs can sometimes be mitigated in some way by using scripting tricks, so if you notice one of this kind please report it on the bug tracker so we can see if something can be done.
 
-2.3. Want more fun?
+3.3. Want more fun?
 -------------------
 
 If you are interested in relays with advanced features, there is a HUD version of this relay (also open source), implementing even more fancy features from ORG. Look for "Satomi's Multi-Relay HUD" on the SL market place or grab it at the OpenCollar Temple if you want a copy of that relay.
