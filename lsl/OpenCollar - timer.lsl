@@ -25,8 +25,6 @@ integer MAX_TIME=0x7FFFFFFF;
 integer ATTACHMENT_COMMAND = 602;
 integer ATTACHMENT_FORWARD = 610;
 //these can change
-integer TIMER_TOMESSAGE=609;
-integer TIMER_FROMMESSAGE=610;
 integer REAL_TIME=1;
 integer REAL_TIME_EXACT=5;
 integer ON_TIME=3;
@@ -96,8 +94,6 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-//integer CHAT = 505;//deprecated
-integer COMMAND_OBJECT = 506;
 integer COMMAND_RLV_RELAY = 507;
 // added so when the sub is locked out they can use postions
 integer COMMAND_WEARERLOCKEDOUT = 521;
@@ -106,18 +102,13 @@ integer COMMAND_WEARERLOCKEDOUT = 521;
 integer POPUP_HELP = 1001;
 
 // messages for storing and retrieving values from http db
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
 //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent by httpdb script when a token has no value in the db
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from DB
+integer LM_SETTING_EMPTY = 2004;//sent by httpdb script when a token has no value in the db
 
-integer LOCALSETTING_SAVE = 2500;
-integer LOCALSETTING_REQUEST = 2501;
-integer LOCALSETTING_RESPONSE = 2502;
-integer LOCALSETTING_DELETE = 2503;
-integer LOCALSETTING_EMPTY = 2504;
 
 // messages for creating OC menu structure
 integer MENUNAME_REQUEST = 3000;
@@ -423,7 +414,6 @@ TimerStart(integer perm)
     g_iWhoCanChangeTime = perm;
     if(g_iRealSetTime)
     {
-        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)REAL_TIME+"|"+(string)(g_iRealSetTime), "");
         g_iRealTimeUpAt=g_iCurrentTime+g_iRealSetTime;
         llMessageLinked(LINK_WHAT, WEARERLOCKOUT, "on", "");
         llMessageLinked(LINK_WHAT, TIMER_EVENT, "start", "realtime");
@@ -435,7 +425,6 @@ TimerStart(integer perm)
     }
     if(g_iOnSetTime)
     {
-        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnSetTime), "");
         g_iOnTimeUpAt=g_iOnTime+g_iOnSetTime;
         llMessageLinked(LINK_WHAT, WEARERLOCKOUT, "on", "");
         llMessageLinked(LINK_WHAT, TIMER_EVENT, "start", "online");
@@ -563,11 +552,9 @@ integer UserCommand(integer iNum, string sStr, key kID)
                     if (g_iOnRunning==1)
                     {
                         g_iOnTimeUpAt += g_iTimeChange;
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnTimeUpAt-g_iLastOnTime), "");
                     }
                     else if(g_iOnRunning==3)
                     {
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnSetTime), "");
                         g_iOnTimeUpAt=g_iOnTime+g_iOnSetTime;
                         g_iOnRunning=1;
                     }
@@ -589,10 +576,6 @@ integer UserCommand(integer iNum, string sStr, key kID)
                             g_iOnRunning=g_iOnSetTime=g_iOnTimeUpAt=0;
                             TimerWhentOff();
                         }
-                        else
-                        {
-                            //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnTimeUpAt-g_iLastOnTime), "");
-                        }
                     }
                 }
                 else if (llGetSubString(sMsg, 0, 0) == "=")
@@ -604,11 +587,9 @@ integer UserCommand(integer iNum, string sStr, key kID)
                     if (g_iOnRunning==1)
                     {
                         g_iOnTimeUpAt = g_iOnTime + g_iTimeChange;
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnTimeUpAt-g_iLastOnTime), "");
                     }
                     else if(g_iOnRunning==3)
                     {
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnSetTime), "");
                         g_iOnTimeUpAt=g_iOnTime + g_iTimeChange;
                         g_iOnRunning=1;
                     }
@@ -647,7 +628,6 @@ integer UserCommand(integer iNum, string sStr, key kID)
                     if (g_iRealRunning==1) g_iRealTimeUpAt += g_iTimeChange;
                     else if(g_iRealRunning==3)
                     {
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnSetTime), "");
                         g_iRealTimeUpAt=g_iCurrentTime+g_iRealSetTime;
                         g_iRealRunning=1;
                     }
@@ -676,7 +656,6 @@ integer UserCommand(integer iNum, string sStr, key kID)
                     if (g_iRealRunning==1) g_iRealTimeUpAt = g_iCurrentTime+g_iRealSetTime;
                     else if(g_iRealRunning==3)
                     {
-                        //llMessageLinked(LINK_WHAT, TIMER_TOMESSAGE, "timer|settimer|"+(string)ON_TIME+"|"+(string)(g_iOnSetTime), "");
                         g_iRealTimeUpAt=g_iCurrentTime+g_iRealSetTime;
                         g_iRealRunning=1;
                     }
@@ -704,7 +683,6 @@ default
         }
         g_iFirstOnTime=MAX_TIME;
         g_iFirstRealTime=MAX_TIME;
-        llMessageLinked(LINK_WHAT, TIMER_FROMMESSAGE, "timer|sendtimers", "");
         llWhisper(g_iInterfaceChannel, "timer|sendtimers");
 
         //end of timekeeper
@@ -729,7 +707,6 @@ default
     on_rez(integer iParam)
     {
         g_iLastTime=g_iLastRez=llGetUnixTime();
-        llMessageLinked(LINK_WHAT, TIMER_FROMMESSAGE, "timer|sendtimers", "");
         llWhisper(g_iInterfaceChannel, "timer|sendtimers");
         if (g_iRealRunning == 1 || g_iOnRunning == 1)
         {
@@ -742,7 +719,7 @@ default
     link_message(integer iSender, integer iNum, string sStr, key kID)
     {
         list info  = llParseString2List (sStr, ["|"], []);
-        if((iNum==TIMER_TOMESSAGE || iNum==ATTACHMENT_FORWARD)&&llList2String(info, 0)=="timer")//request for us
+        if(iNum==ATTACHMENT_FORWARD && llList2String(info, 0)=="timer")//request for us
         {
             Debug(sStr);
             string sCommand = llList2String(info, 1);
@@ -809,31 +786,27 @@ default
             {
                 llWhisper(g_iInterfaceChannel, g_sMessage);//need to wispear
             }
-            else if(iNum==TIMER_TOMESSAGE)
-            {
-                llMessageLinked(LINK_WHAT, TIMER_FROMMESSAGE, g_sMessage, "");//inside script
-            }
         }
         else if(iNum == COMMAND_WEARERLOCKEDOUT && sStr == "menu")
         {
             if (g_iRealRunning || g_iRealRunning)
                 Notify(kID , "You are locked out of the " + g_sToyName + " until the timer expires", FALSE);
         }
-        else if (iNum == LOCALSETTING_DELETE )
+        else if (iNum == LM_SETTING_DELETE )
         {
             if (sStr == "leashedto")
             {
                 g_iWhoCanChangeLeash=504;
             }
         }
-        else if (iNum == HTTPDB_DELETE)
+        else if (iNum == LM_SETTING_DELETE)
         {
             if (sStr == "locked")
             {
                 g_iCollarLocked=0;
             }
         }
-        else if (iNum == LOCALSETTING_SAVE)
+        else if (iNum == LM_SETTING_SAVE)
         {
             if (llGetSubString(sStr, 0, 8) == "leashedto")
             {
@@ -845,14 +818,14 @@ default
                 }
             }
         }
-        else if (iNum == HTTPDB_SAVE)
+        else if (iNum == LM_SETTING_SAVE)
         {
             if (sStr == "locked=1")
             {
                 g_iCollarLocked=1;
             }
         }
-        else if (iNum == HTTPDB_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
         {
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
@@ -957,7 +930,6 @@ default
             //could store which is need but if both are trigered it will have to send both anyway I prefer not to check for that.
             g_sMessage="timer|timeis|"+(string)ON_TIME+"|"+(string)g_iOnTime;
             llWhisper(g_iInterfaceChannel, g_sMessage);
-            llMessageLinked(LINK_WHAT, TIMER_FROMMESSAGE, g_sMessage, "");
             
             g_iFirstOnTime=MAX_TIME;
             g_iTimesLength=llGetListLength(g_lTimes);
@@ -982,7 +954,6 @@ default
             //could store which is need but if both are trigered it will have to send both anyway I prefer not to check for that.
             g_sMessage="timer|timeis|"+(string)REAL_TIME+"|"+(string)g_iCurrentTime;
             llWhisper(g_iInterfaceChannel, g_sMessage);
-            llMessageLinked(LINK_WHAT, TIMER_FROMMESSAGE, g_sMessage, "");
             
             g_iFirstRealTime=MAX_TIME;
             g_iTimesLength=llGetListLength(g_lTimes);

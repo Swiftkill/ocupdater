@@ -15,16 +15,16 @@ integer COMMAND_RLV_RELAY = 507; // now will be used from rlvrelay to rlvmain, f
 integer COMMAND_SAFEWORD = 510;
 integer COMMAND_RELAY_SAFEWORD = 511;
 
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
                             //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
 integer MENUNAME_REMOVE = 3003;
 
-integer RLVR_CMD = 6010; //let's do that for now (note this is not RLV_CMD)
+integer RLV_CMD = 6000;
 integer RLV_REFRESH = 6001;//RLV plugins should reinstate their restrictions upon receiving this message.
 
 integer RLV_OFF = 6100; // send to inform plugins that RLV is disabled now, no message or key needed
@@ -167,7 +167,7 @@ SaveSettings()
         +",avwhitelistnames:"+llDumpList2String(g_lAvWhiteListNames,"/");
     if ( g_lAvBlackList != [] ) sNewSettings+=",avblacklist:"+llDumpList2String(g_lAvBlackList,"/")
         +",avblacklistnames:"+llDumpList2String(g_lAvBlackListNames,"/");
-    llMessageLinked(LINK_SET, HTTPDB_SAVE, sNewSettings, NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, sNewSettings, NULL_KEY);
 }
 
 UpdateSettings(string sSettings)
@@ -205,19 +205,18 @@ UpdateSettings(string sSettings)
 
 integer Auth(key object, key user)
 {
-
     integer iAuth=1;
     key kOwner = llGetOwnerKey(object);
     //object auth
     integer iSourceIndex=llListFindList(g_lSources,[object]);
     if (~iSourceIndex) {}
     else if (~llListFindList(g_lTempBlackList+g_lObjBlackList,[object])) return -1;
-    else if (~llListFindList(g_lAvBlackList,[kOwner])) return -1;
+    else if (~llListFindList(g_lAvBlackList,[(string)kOwner])) return -1;
     else if (~llListFindList(g_lCollarBlackList,[(string)kOwner])) return -1;
     else if (g_iBaseMode==3) {}
     else if (g_iLandMode && llGetOwnerKey(object)==llGetLandOwnerAt(llGetPos())) {}
     else if (~llListFindList(g_lTempWhiteList+g_lObjWhiteList,[object])) {}
-    else if (~llListFindList(g_lAvWhiteList,[kOwner])) {}
+    else if (~llListFindList(g_lAvWhiteList,[(string)kOwner])) {}
     else if (~llListFindList(g_lCollarOwnersList+g_lCollarSecOwnersList,[(string)kOwner])) {}
 //    else if (g_iBaseMode==1) return -1; we should not block playful in restricted mode
     else iAuth=0;
@@ -287,9 +286,9 @@ string HandleCommand(string sIdent, key kID, string sCom, integer iAuthed)
         list lSubArgs = llParseString2List(sCom,["="],[]);
         string sVal = llList2String(lSubArgs,1);
         string sAck = "ok";
-        if (sCom == "!release" || sCom == "@clear") llMessageLinked(LINK_SET,RLVR_CMD,"clear",kID);
+        if (sCom == "!release" || sCom == "@clear") llMessageLinked(LINK_SET,RLV_CMD,"clear",kID);
         else if (sCom == "!version") sAck = "1100";
-        else if (sCom == "!implversion") sAck = "OpenCollar 3.6";
+        else if (sCom == "!implversion") sAck = "OpenCollar 3.7";
         else if (sCom == "!x-orgversions") sAck = "ORG=0003/who=001";
         else if (llGetSubString(sCom,0,6)=="!x-who/") {kWho = SanitizeKey(llGetSubString(sCom,7,42)); iGotWho=TRUE;}
         else if (llGetSubString(sCom,0,0) == "!") sAck = "ko"; // ko unknown meta-commands
@@ -303,11 +302,11 @@ string HandleCommand(string sIdent, key kID, string sCom, integer iAuthed)
         }//probably an ill-formed command, not answering
         else if ((!llSubStringIndex(sCom,"@version"))||(!llSubStringIndex(sCom,"@get"))||(!llSubStringIndex(sCom,"@findfolder"))) //(IsChannelCmd(sCom))
         {
-            if ((integer)sVal) llMessageLinked(LINK_SET,RLVR_CMD, llGetSubString(sCom,1,-1), kID); //now with RLV 1.23, negative channels can also be used
+            if ((integer)sVal) llMessageLinked(LINK_SET,RLV_CMD, llGetSubString(sCom,1,-1), kID); //now with RLV 1.23, negative channels can also be used
             else sAck="ko";
         }
         else if (g_iPlayMode&&llGetSubString(sCom,0,0)=="@"&&sVal!="n"&&sVal!="add")
-            llMessageLinked(LINK_SET,RLVR_CMD, llGetSubString(sCom,1,-1), kID);
+            llMessageLinked(LINK_SET,RLV_CMD, llGetSubString(sCom,1,-1), kID);
         else if (!iAuthed)
         {
             if (iGotWho) return "!x-who/"+(string)kWho+"|"+llDumpList2String(llList2List(lCommands,i,-1),"|");
@@ -318,7 +317,7 @@ string HandleCommand(string sIdent, key kID, string sCom, integer iAuthed)
             string sBehav=llGetSubString(llList2String(lSubArgs,0),1,-1);
             if (sVal=="force"||sVal=="n"||sVal=="add"||sVal=="y"||sVal=="rem"||sBehav=="clear")
             {
-                llMessageLinked(LINK_SET,RLVR_CMD,sBehav+"="+sVal,kID);
+                llMessageLinked(LINK_SET,RLV_CMD,sBehav+"="+sVal,kID);
             }
             else sAck="ko";
         }
@@ -755,7 +754,7 @@ default
             if (~i) g_lSources=llDeleteSubList(g_lSources,i,i);
         }
         else if (UserCommand(iNum, sStr, kID)) return;
-        else if (iNum == HTTPDB_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
         {   //this is tricky since our db value contains equals signs
             //split string on both comma and equals sign
             //first see if this is the token we care about
@@ -780,7 +779,7 @@ default
                 g_lCollarBlackList = llParseString2List(llList2String(lParams, 1), [","], []);
             }
         }
-        else if (iNum == HTTPDB_SAVE)
+        else if (iNum == LM_SETTING_SAVE)
         {   //this is tricky since our db sValue contains equals signs
             //split string on both comma and equals sign
             //first see if this is the sToken we care about
@@ -848,7 +847,7 @@ default
                     else if (sMsg=="MinMode") MinModeMenu(kAv, iAuth);
                     else if (sMsg=="Help")
                     {
-                        llGiveInventory(kAv,"OpenCollar - rlvrelay - Help");
+                        llGiveInventory(kAv,"OpenCollar RLV Relay Help");
                         Menu(kAv, iAuth);
                     }
                     else if (sMsg==UPMENU)
@@ -1041,7 +1040,7 @@ default
             key kID = llList2Key(g_lSources,i);
             vector vObjPos = llList2Vector(llGetObjectDetails(kID, [OBJECT_POS]),0);
             if (vObjPos == <0, 0, 0> || llVecDist(vObjPos, vMyPos) > 100) // 100: max shout distance
-                llMessageLinked(LINK_SET,RLVR_CMD,"clear",kID);
+                llMessageLinked(LINK_SET,RLV_CMD,"clear",kID);
         }
         llSetTimerEvent(g_iGarbageRate);
         g_lTempBlackList=[];

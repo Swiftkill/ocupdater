@@ -20,6 +20,8 @@ list g_lNewButtons;//is this used? 2010/01/14 Starship
 //dialog handles
 key g_kElementID;
 key g_ktextureID;
+//touch request handle
+key g_kTouchID;
 
 integer g_iAppLock = FALSE;
 string g_sAppLockToken = "AppLock";
@@ -31,17 +33,16 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-integer CHAT = 505;
 
 //integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
 //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent when a token has no value in the httpdb
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from DB
+integer LM_SETTING_EMPTY = 2004;//sent when a token has no value in the httpdb
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
@@ -49,6 +50,11 @@ integer MENUNAME_RESPONSE = 3001;
 integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
+
+integer TOUCH_REQUEST = -9500;
+integer TOUCH_CANCEL = -9501;
+integer TOUCH_RESPONSE = -9502;
+integer TOUCH_EXPIRE = -9503;
 //5000 block is reserved for IM slaves
 
 string UPMENU = "^";
@@ -71,7 +77,7 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
     }
 }
 
-key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+key ShortKey()
 {
     //key generation
     //just pick 8 random hex digits and pad the rest with 0.  Good enough for dialog uniqueness.
@@ -82,9 +88,24 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
         integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
         sOut += llGetSubString( "0123456789abcdef", iIndex, iIndex);
     }
-    key kID = (sOut + "-0000-0000-0000-000000000000");
+    return (sOut + "-0000-0000-0000-000000000000");
+}
+
+key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+{
+    key kID = ShortKey();
     llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
-    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+        + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    return kID;
+} 
+
+key TouchRequest(key kRCPT,  integer iTouchStart, integer iTouchEnd, integer iAuth)
+{
+    key kID = ShortKey();
+    integer iFlags = 0;
+    if (iTouchStart) iFlags = iFlags | 0x01;
+    if (iTouchEnd) iFlags = iFlags | 0x02;
+    llMessageLinked(LINK_SET, TOUCH_REQUEST, (string)kRCPT + "|" + (string)iFlags + "|" + (string)iAuth, kID);
     return kID;
 } 
 
@@ -107,9 +128,9 @@ TextureMenu(key kID, integer iPage, integer iAuth)
 
 ElementMenu(key kAv, integer iAuth)
 {
-    string sPrompt = "Pick which part of the collar you would like to retexture";
+    string sPrompt = "Pick which part of the collar you would like to retexture.\n\nChoose *Touch* if you want to select the part by directly clicking on the collar.";
     lButtons = llListSort(g_lElements, 1, TRUE);
-    g_kElementID = Dialog(kAv, sPrompt, lButtons, [UPMENU], 0, iAuth);
+    g_kElementID = Dialog(kAv, sPrompt, lButtons, ["*Touch*", UPMENU], 0, iAuth);
 }
 
 string ElementType(integer iLinkNum)
@@ -192,7 +213,7 @@ SetElementTexture(string sElement, key kTex)
         g_lTextures = llListReplaceList(g_lTextures, [kTex], iIndex + 1, iIndex + 1);
     }
     //save to httpdb
-    llMessageLinked(LINK_SET, HTTPDB_SAVE, g_sDBToken + "=" + llDumpList2String(g_lTextures, "~"), NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lTextures, "~"), NULL_KEY);
 }
 
 default
@@ -262,7 +283,7 @@ default
             else if (sStr == "reset" && (iNum == COMMAND_OWNER || kID == g_kWearer))
             {
                 //clear saved settings
-                //llMessageLinked(LINK_SET, HTTPDB_DELETE, g_sDBToken, NULL_KEY);
+                //llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
                 llResetScript();
             }
             else if (sStr == "settings")
@@ -288,7 +309,7 @@ default
                 }
             }
         }
-        else if (iNum == HTTPDB_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
         {
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
@@ -325,6 +346,11 @@ default
                         //main menu
                         llMessageLinked(LINK_SET, iAuth, "menu "+g_sParentMenu, kAv);
                     }
+                    else if (sMessage == "*Touch*")
+                    {
+                        Notify(kAv, "Please touch the part of the collar you want to retexture. You can press ctr+alt+T to see invisible parts.", FALSE);
+                        g_kTouchID = TouchRequest(kAv, TRUE, FALSE, iAuth);
+                    }
                     else
                     {
                         //we just got the element name
@@ -348,6 +374,28 @@ default
                         SetElementTexture(s_CurrentElement, (key)sTex);
                         TextureMenu(kAv, iPage, iAuth);
                     }
+                }
+            }
+        }
+        else if (iNum == TOUCH_RESPONSE)
+        {
+            if (kID == g_kTouchID)
+            {
+                list lParams = llParseString2List(sStr, ["|"], []);
+                key kAv = (key)llList2String(lParams, 0);
+                integer iAuth = (integer)llList2String(lParams, 1);
+                integer iLinkNumber = (integer)llList2String(lParams, 3);
+                
+                string sElement = ElementType(iLinkNumber);
+                if (sElement != "notexture")
+                {
+                    TextureMenu(kAv, 0, iAuth);
+                    Notify(kAv, "You selected \""+sElement+"\".", FALSE);
+                }
+                else
+                {
+                    Notify(kAv, "You selected a prim which is not texturable. You can try again.", FALSE);
+                    ElementMenu(kAv, iAuth);
                 }
             }
         }

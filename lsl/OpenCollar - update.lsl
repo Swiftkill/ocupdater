@@ -33,11 +33,11 @@ key wearer;
 integer COMMAND_NOAUTH = 0;
 integer COMMAND_OWNER = 500;
 integer COMMAND_WEARER = 503;
-integer HTTPDB_SAVE = 2000;
-integer HTTPDB_REQUEST = 2001;
-integer HTTPDB_RESPONSE = 2002;
-integer HTTPDB_DELETE = 2003;
-integer HTTPDB_EMPTY = 2004;
+integer LM_SETTING_SAVE = 2000;
+integer LM_SETTING_REQUEST = 2001;
+integer LM_SETTING_RESPONSE = 2002;
+integer LM_SETTING_DELETE = 2003;
+integer LM_SETTING_EMPTY = 2004;
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
@@ -62,13 +62,13 @@ key g_kUpdaterOrb;
 
 // We check for the latest version number by looking at the "~version" notecard
 // inside the 'release' branch of the collar's Github repo.
-string version_check_url = "https://raw.github.com/nirea/ocupdater/release/lsl/~version";
+string version_check_url = "https://raw.github.com/SatomiAhn/ocupdater/SatomiAlpha/lsl/~version";
 key github_version_request;
 
 // A request to this URL will trigger delivery of an updater.  We omit the
 // "version=blah" parameter because we don't want the server deciding whether
 // we should get an updater or not.  We just want one.
-string delivery_url = "http://update.mycollar.org/updater/check?object=OpenCollarUpdater&update=yes";
+string delivery_url = "http://update.mycollar.org/updater/check?object=OpenCollarUpdaterSatomiAlpha&update=yes";
 key appengine_delivery_request;
 
 // The news system is back!  Only smarter this time.  News will be kept in a

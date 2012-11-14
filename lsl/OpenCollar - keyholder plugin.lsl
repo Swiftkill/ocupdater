@@ -4,6 +4,7 @@
 //
 // OC3.7xx by Satomi Ahn
 // - New authed dialogs system.
+// - Removed OCCD stuff.
 //
 // OC3.526.2 by WhiteFire Sondergaard
 // - Safeword Support. DURP.
@@ -122,7 +123,6 @@ integer LINK_WHAT = LINK_SET;
 string g_szSubmenu = "Key Holder"; // Name of the submenu
 string g_szParentmenu = "AddOns"; // name of the menu, where the menu plugs in, should be usually Addons. Please do not use the mainmenu anymore ( AddOns or Main is recomended depending on the toy. )
 
-integer g_iConfigMenu = FALSE; // Seperate root config menu? For OCCD and other non-collar toys.
 string g_szKeyConfigMenu = "Key Holder Config";
 string g_szConfigMenu = "Config";
 
@@ -163,11 +163,6 @@ integer g_iGlobalKey = TRUE; // are we on the global key.
 string TAKEKEY = "*Take Key*";
 string RETURNKEY = "*Return Key*";
 
-// OOCD stuff
-integer COMMAND_OCCD_BITS = -4077;  // tells the bits to change state
-integer COMMAND_OCCD_STATE = -4078; // tells the OCCD module what state the user sent to the bits
-integer COMMAND_OCCD_ALLOW_HIDE = -4079; // tells the OCCD bits module that its allowed to hide the bits when the wearer asks
-
 // Various variables needed by cuffs.
 integer g_nCmdChannel    = -190890;
 integer g_nCmdChannelOffset = 0xCC0CC;       // offset to be used to make sure we do not interfere with other items using the same technique for
@@ -179,8 +174,7 @@ integer g_iKeyHolderChannel = -0x3FFF0502;
 // key;return;reason
 
 // ------ TOKEN DEFINITIONS ------
-string TOK_DB = "keyholder"; // Stuff that gets stored in the settings DB
-string TOK_LOCAL = "localkeyholder"; // Values stroed in the local cache.
+string TOK_STORE = "keyholder"; // Stuff that gets stored in the settings store
 
 // State stuff
 key g_keyWearer; // key of the current wearer to reset only on owner changes
@@ -211,8 +205,6 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-//integer CHAT = 505;//deprecated
-integer COMMAND_OBJECT = 506;
 integer COMMAND_RLV_RELAY = 507;
 integer COMMAND_SAFEWORD = 510;
 integer COMMAND_BLACKLIST = 520;
@@ -222,20 +214,13 @@ integer COMMAND_WEARERLOCKEDOUT = 521;
 //integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bit of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
-// messages for storing and retrieving values from http db
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+// messages for storing and retrieving values from settings store
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to store
 //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent by httpdb script when a token has no value in the db
-
-// same as HTTPDB_*, but for storing settings locally in the settings script
-integer LOCALSETTING_SAVE = 2500;
-integer LOCALSETTING_REQUEST = 2501;
-integer LOCALSETTING_RESPONSE = 2502;
-integer LOCALSETTING_DELETE = 2503;
-integer LOCALSETTING_EMPTY = 2504;
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the settings script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from store
+integer LM_SETTING_EMPTY = 2004;//sent by settings script when a token has no value in the store
 
 // messages for creating OC menu structure
 integer MENUNAME_REQUEST = 3000;
@@ -478,8 +463,7 @@ DoMenuSpecial(key keyID, integer page, integer special, integer iAuth)
         if (!kh_lockout)
             mybuttons += "Lockout";
 
-        if (!g_iConfigMenu)
-            mybuttons += [ "Configure" ];
+        mybuttons += [ "Configure" ];
     }
     
     // Optional
@@ -780,8 +764,8 @@ updateVisible()
 //===============================================================================
 saveSettings()
 {
-    llMessageLinked(LINK_THIS, HTTPDB_SAVE, 
-        g_szPrefix + TOK_DB + "=" +
+    llMessageLinked(LINK_THIS, LM_SETTING_SAVE, 
+        g_szPrefix + TOK_STORE + "=" +
         llDumpList2String([
                 kh_on,
                 kh_range,
@@ -794,21 +778,6 @@ saveSettings()
                 kh_auto_return_time,
                 g_iGlobalKey
             ], ","), NULL_KEY);
-    
-    // Save the keyholder if we have one.
-    if (kh_key != NULL_KEY)
-    {
-        llMessageLinked(LINK_THIS, LOCALSETTING_SAVE, TOK_LOCAL + "=" +
-            llDumpList2String([ 
-                kh_key,
-                kh_type,
-                kh_name,
-                kh_saved_openaccess,
-                kh_saved_locked
-            ], ","), NULL_KEY);
-    } else {
-        llMessageLinked(LINK_THIS, LOCALSETTING_DELETE, TOK_LOCAL, NULL_KEY);
-    }
 }
 
 loadDBSettings(string sSettings)
@@ -1052,8 +1021,6 @@ default
         // send request to main menu and ask other menus if they want to register with us
         llMessageLinked(LINK_WHAT, MENUNAME_REQUEST, g_szSubmenu, NULL_KEY);
         llMessageLinked(LINK_WHAT, MENUNAME_RESPONSE, g_szParentmenu + "|" + g_szSubmenu, NULL_KEY);
-        if (g_iConfigMenu)
-            llMessageLinked(LINK_WHAT, MENUNAME_RESPONSE, g_szConfigMenu + "|" + g_szKeyConfigMenu, NULL_KEY);
         // get dbprefix from object desc, so that it doesn't need to be hard coded, and scripts between differently-primmed collars can be identical
         g_szPrefix = GetDBPrefix();
         g_keyWearer=llGetOwner();
@@ -1096,8 +1063,6 @@ default
         {
             if (str == g_szParentmenu)
                 llMessageLinked(LINK_WHAT, MENUNAME_RESPONSE, g_szParentmenu + "|" + g_szSubmenu, NULL_KEY);
-            else if (str == g_szConfigMenu && g_iConfigMenu)
-                llMessageLinked(LINK_WHAT, MENUNAME_RESPONSE, g_szConfigMenu + "|" + g_szKeyConfigMenu, NULL_KEY);
 
             if (str == "Main") setMainMenu();
             else if (str == g_szTimerMenu) setTimerMenu();
@@ -1179,15 +1144,12 @@ default
                         llMessageLinked(LINK_WHAT, iAuth, "menu "+g_szParentmenu, av);
                     else if (id == g_keyConfigMenuID)
                     {
-                        if (g_iConfigMenu)
-                            llMessageLinked(LINK_WHAT, iAuth, "menu " + g_szConfigMenu, av);
-                        else
-                            DoMenu(av, 0, iAuth);
+                        DoMenu(av, 0, iAuth);
                     }
                     else if (id == g_keyConfigAutoReturnMenuID)
                         DoMenuConfigure(av, 0, iAuth);
                 }
-                else if (message == "Configure" && !g_iConfigMenu)
+                else if (message == "Configure")
                 {
                     DoMenuConfigure(av, 0, iAuth);
                 }
@@ -1227,7 +1189,7 @@ default
             if (id == g_keyConfigMenuID)
                 g_keyConfigMenuID = NULL_KEY;
         }
-        else if (num == HTTPDB_RESPONSE || num == HTTPDB_SAVE)
+        else if (num == LM_SETTING_RESPONSE || num == LM_SETTING_SAVE)
         {
             list params = llParseString2List(str, ["="], []);
             string token = llList2String(params, 0);
@@ -1242,23 +1204,12 @@ default
             {
                 oc_openaccess = (integer)value;
             }
-            else if ( CompareDBPrefix(token, TOK_DB) )
+            else if ( CompareDBPrefix(token, TOK_STORE) )
             {
                 loadDBSettings(value);
             }
         }
-        else if (num == LOCALSETTING_RESPONSE || num == LOCALSETTING_SAVE)
-        {
-            list params = llParseString2List(str, ["="], []);
-            string token = llList2String(params, 0);
-            string value = llList2String(params, 1);
-            
-            if ( CompareDBPrefix(token, TOK_LOCAL) )
-            {
-                loadLocalSettings(value);
-            }
-        }
-        else if (num == HTTPDB_DELETE)
+        else if (num == LM_SETTING_DELETE)
         {
             // Saddly it's deleted to indicate FALSE rather than set to 0...
             if ( CompareDBPrefix(str, "locked") )
@@ -1271,27 +1222,6 @@ default
         else if (num == COMMAND_SAFEWORD)
         {
             ReturnKey(llKey2Name(id) + " has safeworded, key auto-returned.", FALSE);
-        }
-        else if (num == COMMAND_OCCD_BITS)
-        {
-            if (str == "hide" || str == "unlocked")
-            {
-                g_iDeviceShown = FALSE;
-                updateVisible();
-            }
-            else if (str == "locked")
-            {
-                g_iDeviceShown = TRUE;
-                updateVisible();
-            }
-        }
-        else if (num == COMMAND_OCCD_STATE)
-        {
-            if (str == "hide")
-            {
-                g_iDeviceShown = FALSE;
-                updateVisible();
-            }
         }
         else if (num == TIMER_EVENT)
         {

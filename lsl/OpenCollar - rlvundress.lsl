@@ -104,16 +104,15 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-integer CHAT = 505;
 
 integer POPUP_HELP = 1001;
 
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
 //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent by httpdb script when a token has no value in the db
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from DB
+integer LM_SETTING_EMPTY = 2004;//sent by httpdb script when a token has no value in the db
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
@@ -380,7 +379,7 @@ ClearSettings()
     g_lLockedAttach=[];
     SaveLockAllFlag(0);
     //remove tpsettings from DB
-    llMessageLinked(LINK_SET, HTTPDB_DELETE, g_sDBToken, NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
     //main RLV script will take care of sending @clear to viewer
 }
 
@@ -394,29 +393,23 @@ SaveLockAllFlag(integer iSetting)
     if(iSetting > 0)
     {
         //save the flag to the database
-        llMessageLinked(LINK_SET, HTTPDB_SAVE, g_sDBTokenLockAll+"=Y", NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBTokenLockAll+"=Y", NULL_KEY);
     }
     else
     {
         //delete the flag from the database
-        llMessageLinked(LINK_SET, HTTPDB_DELETE, g_sDBTokenLockAll, NULL_KEY);
+        llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBTokenLockAll, NULL_KEY);
     }
 }
 
 DoLockAll(key kID)
 {
-    llMessageLinked(LINK_SET, RLV_CMD, "addattach=n", kID);
-    llMessageLinked(LINK_SET, RLV_CMD, "remattach=n", kID);
-    llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit=n", kID);
-    llMessageLinked(LINK_SET, RLV_CMD,  "addoutfit=n", kID);
+    llMessageLinked(LINK_SET, RLV_CMD, "addattach=n,remattach=n,remoutfit=n,addoutfit=n", NULL_KEY);
 }
 
 DoUnlockAll(key kID)
 {
-    llMessageLinked(LINK_SET, RLV_CMD, "addattach=y", kID);
-    llMessageLinked(LINK_SET, RLV_CMD, "remattach=y", kID);
-    llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit=y", kID);
-    llMessageLinked(LINK_SET, RLV_CMD,  "addoutfit=y", kID);
+    llMessageLinked(LINK_SET, RLV_CMD, "addattach=y,remattach=y,remoutfit=y,addoutfit=y", NULL_KEY);
 }
 
 // returns TRUE if eligible (AUTHED link message number)
@@ -439,7 +432,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
         }
         else
         {
-            llMessageLinked(LINK_SET, RLV_CMD, sStr, kID);
+            llMessageLinked(LINK_SET, RLV_CMD, sStr, NULL_KEY);
             string sOption = llList2String(llParseString2List(sStr, ["="], []), 0);
             string sParam = llList2String(llParseString2List(sStr, ["="], []), 1);
             integer iIndex = llListFindList(g_lSettings, [sOption]);
@@ -455,7 +448,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
                 {   //we already have a setting for this option.  update it.
                     g_lSettings = llListReplaceList(g_lSettings, [sOption, sParam], iIndex, iIndex + 1);
                 }
-                llMessageLinked(LINK_SET, HTTPDB_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+                llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
             }
             else if (sParam == "y")
             {
@@ -464,9 +457,9 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
                     g_lSettings = llDeleteSubList(g_lSettings, iIndex, iIndex + 1);
                 }
                 if (llGetListLength(g_lSettings)>0)
-                    llMessageLinked(LINK_SET, HTTPDB_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lSettings, ","), NULL_KEY);
                 else
-                    llMessageLinked(LINK_SET, HTTPDB_DELETE, g_sDBToken, NULL_KEY);
+                    llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
             }
         }
     }
@@ -667,7 +660,7 @@ default
         {
             llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
         }
-        else if (iNum == HTTPDB_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
         {   //this is tricky since our db value contains equals signs
             //split string on both comma and equals sign
             //first see if this is the token we care about
@@ -763,7 +756,7 @@ default
                     // SA: we can count ourselves lucky that all people who can see the menu have sufficient privileges for remoutfit commands!
                     //    Note for people looking for the auth check: it would have been here, look no further!
                     { //send the RLV command to remove it.
-                        llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit=force", kAv);
+                        llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit=force", NULL_KEY);
                         //Return menu
                         //sleep fof a sec to let things detach
                         llSleep(0.5);
@@ -773,7 +766,7 @@ default
                     { //we got a cloth point.
                         sMessage = llToLower(sMessage);
                         //send the RLV command to remove it.
-                        llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit:" + sMessage + "=force", kAv);
+                        llMessageLinked(LINK_SET, RLV_CMD,  "remoutfit:" + sMessage + "=force", NULL_KEY);
                         //Return menu
                         //sleep fof a sec to let things detach
                         llSleep(0.5);
@@ -788,7 +781,7 @@ default
                     {    //we got an attach point.  send a message to detach
                         sMessage = llToLower(sMessage);
                         //send the RLV command to remove it.
-                        llMessageLinked(LINK_SET, RLV_CMD,  "detach:" + sMessage + "=force", kAv);
+                        llMessageLinked(LINK_SET, RLV_CMD,  "detach:" + sMessage + "=force", NULL_KEY);
                         //sleep for a sec to let tihngs detach
                         llSleep(0.5);
                         //Return menu

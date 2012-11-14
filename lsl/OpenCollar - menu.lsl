@@ -1,4 +1,3 @@
-//OpenCollar - menu
 //Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 //on start, send request for submenu names
 //on getting submenu name, add to list if not already present
@@ -29,17 +28,16 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-integer CHAT = 505;
 
 //integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
                             //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent when a token has no value in the httpdb
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from DB
+integer LM_SETTING_EMPTY = 2004;//sent when a token has no value in the httpdb
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
@@ -222,11 +220,6 @@ default
         llSleep(1.0);//delay sending this message until we're fairly sure that other scripts have reset too, just in case
         g_iScriptCount = llGetInventoryNumber(INVENTORY_SCRIPT);
         MenuInit();      
-    }
-    
-    touch_start(integer iNum)
-    { // SA: true entry point where auth is *really* needed
-        llMessageLinked(LINK_SET, COMMAND_NOAUTH, "menu", llDetectedKey(0));
     }
     
     link_message(integer iSender, integer iNum, string sStr, key kID)

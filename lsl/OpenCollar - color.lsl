@@ -98,6 +98,7 @@ list g_lButtons;
 list g_lNewButtons;
 
 list g_lMenuIDs;
+key g_kTouchID;
 
 integer g_iAppLock = FALSE;
 string g_sAppLockToken = "AppLock";
@@ -109,17 +110,16 @@ integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
-integer CHAT = 505;
 
 //integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
-integer HTTPDB_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
+integer LM_SETTING_SAVE = 2000;//scripts send messages on this channel to have settings saved to httpdb
 //str must be in form of "token=value"
-integer HTTPDB_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
-integer HTTPDB_RESPONSE = 2002;//the httpdb script will send responses on this channel
-integer HTTPDB_DELETE = 2003;//delete token from DB
-integer HTTPDB_EMPTY = 2004;//sent when a token has no value in the httpdb
+integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for settings on this channel
+integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
+integer LM_SETTING_DELETE = 2003;//delete token from DB
+integer LM_SETTING_EMPTY = 2004;//sent when a token has no value in the httpdb
 
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
@@ -128,6 +128,10 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
+integer TOUCH_REQUEST = -9500;
+integer TOUCH_CANCEL = -9501;
+integer TOUCH_RESPONSE = -9502;
+integer TOUCH_EXPIRE = -9503;
 
 
 //5000 block is reserved for IM slaves
@@ -136,8 +140,7 @@ string UPMENU = "^";
 
 key g_kWearer;
 
-
-key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+key ShortKey()
 {
     //key generation
     //just pick 8 random hex digits and pad the rest with 0.  Good enough for dialog uniqueness.
@@ -148,9 +151,24 @@ key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integ
         integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
         sOut += llGetSubString( "0123456789abcdef", iIndex, iIndex);
     }
-    key kID = (sOut + "-0000-0000-0000-000000000000");
+    return (key) (sOut + "-0000-0000-0000-000000000000");
+}
+
+key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+{
+    key kID = ShortKey();
     llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
         + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    return kID;
+} 
+
+key TouchRequest(key kRCPT,  integer iTouchStart, integer iTouchEnd, integer iAuth)
+{
+    key kID = ShortKey();
+    integer iFlags = 0;
+    if (iTouchStart) iFlags = iFlags | 0x01;
+    if (iTouchEnd) iFlags = iFlags | 0x02;
+    llMessageLinked(LINK_SET, TOUCH_REQUEST, (string)kRCPT + "|" + (string)iFlags + "|" + (string)iAuth, kID);
     return kID;
 } 
 
@@ -182,9 +200,9 @@ ColorMenu(key kAv, integer iAuth)
 
 ElementMenu(key kAv, integer iAuth)
 {
-    string sPrompt = "Pick which part of the collar you would like to recolor";
+    string sPrompt = "Pick which part of the collar you would like to recolor.\n\nChoose *Touch* if you want to select the part by directly clicking on the collar.";
     g_lButtons = llListSort(g_lElements, 1, TRUE);
-    g_lMenuIDs+=[Dialog(kAv, sPrompt, g_lButtons, [UPMENU],0, iAuth)];
+    g_lMenuIDs+=[Dialog(kAv, sPrompt, g_lButtons, ["*Touch*", UPMENU],0, iAuth)];
 }
 
 string ElementType(integer iLinkNumber)
@@ -269,7 +287,7 @@ SetElementColor(string sElement, vector vColor)
         g_lColorSettings = llListReplaceList(g_lColorSettings, [sStrColor], iIndex + 1, iIndex + 1);
     }
     //save to httpdb
-    llMessageLinked(LINK_SET, HTTPDB_SAVE, g_sDBToken + "=" + llDumpList2String(g_lColorSettings, "~"), NULL_KEY);
+    llMessageLinked(LINK_SET, LM_SETTING_SAVE, g_sDBToken + "=" + llDumpList2String(g_lColorSettings, "~"), NULL_KEY);
     //g_sCurrentElement = "";
 }
 
@@ -323,7 +341,7 @@ default
         if (sStr == "reset" && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER))
         {
             //clear saved settings
-            llMessageLinked(LINK_SET, HTTPDB_DELETE, g_sDBToken, NULL_KEY);
+            llMessageLinked(LINK_SET, LM_SETTING_DELETE, g_sDBToken, NULL_KEY);
             llResetScript();
         }
         else if (iNum >= COMMAND_OWNER && iNum <= COMMAND_WEARER)
@@ -386,7 +404,7 @@ default
 
         }
         
-        else if (iNum == HTTPDB_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
         {
             list lParams = llParseString2List(sStr, ["="], []);
             string sToken = llList2String(lParams, 0);
@@ -436,6 +454,11 @@ default
                         CategoryMenu(kAv, iAuth);
                     }
                 }
+                else if (sMessage == "*Touch*")
+                {
+                    Notify(kAv, "Please touch the part of the collar you want to recolor.", FALSE);
+                    g_kTouchID = TouchRequest(kAv, TRUE, FALSE, iAuth);
+                }
                 else if (g_sCurrentElement == "")
                 {
                     //we just got the element name
@@ -478,7 +501,29 @@ default
                 g_lMenuIDs=llDeleteSubList(g_lMenuIDs,iMenuIndex,iMenuIndex);
             }
         }
-
+        else if (iNum == TOUCH_RESPONSE)
+        {
+            if (kID == g_kTouchID)
+            {
+                list lParams = llParseString2List(sStr, ["|"], []);
+                key kAv = (key)llList2String(lParams, 0);
+                integer iAuth = (integer)llList2String(lParams, 1);
+                integer iLinkNumber = (integer)llList2String(lParams, 3);
+                
+                string sElement = ElementType(iLinkNumber);
+                if (sElement != "nocolor")
+                {
+                    CategoryMenu(kAv, iAuth);
+                    g_sCurrentElement = sElement;
+                    Notify(kAv, "You selected \""+sElement+"\".", FALSE);
+                }
+                else
+                {
+                    Notify(kAv, "You selected a prim which is not colorable. You can try again.", FALSE);
+                    ElementMenu(kAv, iAuth);
+                }
+            }
+        }
     }
 
     on_rez(integer iParam)
