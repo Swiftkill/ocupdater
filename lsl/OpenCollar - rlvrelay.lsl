@@ -49,7 +49,7 @@ key g_kAuthMenuID;
 key g_kListMenuID;
 key g_kListID;
 
-integer g_iGarbageRate = 180; //garbage collection rate
+integer g_iGarbageRate = 60; //garbage collection rate
 
 list g_lSources=[];
 //list users=[];
