@@ -79,32 +79,17 @@ Notify(key keyID, string sMsg, integer nAlsoNotifyWearer)
     }
 }
 
-
-key ShortKey()
-{
-    //key generation
-    //just pick 8 random hex digits and pad the rest with 0.  Good enough for dialog uniqueness.
-    string sOut;
-    integer n;
-    for (n = 0; n < 8; ++n)
-    {
-        integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
-        sOut += llGetSubString( "0123456789abcdef", iIndex, iIndex);
-    }
-    return (sOut + "-0000-0000-0000-000000000000");
-}
-
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
-    key kID = ShortKey();
+    key kID = llGenerateKey();
     llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
-        + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
 } 
 
 key TouchRequest(key kRCPT,  integer iTouchStart, integer iTouchEnd, integer iAuth)
 {
-    key kID = ShortKey();
+    key kID = llGenerateKey();
     integer iFlags = 0;
     if (iTouchStart) iFlags = iFlags | 0x01;
     if (iTouchEnd) iFlags = iFlags | 0x02;

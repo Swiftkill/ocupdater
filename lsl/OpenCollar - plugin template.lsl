@@ -157,22 +157,13 @@ Notify(key kID, string sMsg, integer iAlsoNotifyWearer)
 //=
 //===============================================================================
 
-
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
-    string sChars = "0123456789abcdef";
-    integer iLength = 16;
-    string sOut;
-    integer n;
-    for (n = 0; n < 8; n++)
-    {
-        integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
-        sOut += llGetSubString(sChars, iIndex, iIndex);
-    }
-    key kID = (key)(sOut + "-0000-0000-0000-000000000000");
-    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`" + "|" + (string)iAuth), kID);
+    key kID = llGenerateKey();
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
+    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
-}
+} 
 
 //===============================================================================
 //= parameters   :    string    sMsg    message string received

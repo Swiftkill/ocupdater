@@ -65,18 +65,9 @@ Debug(string text)
 
 key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
 {
-    //key generation
-    //just pick 8 random hex digits and pad the rest with 0.  Good enough for dialog uniqueness.
-    string sOut;
-    integer n;
-    for (n = 0; n < 8; ++n)
-    {
-        integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
-        sOut += llGetSubString( "0123456789abcdef", iIndex, iIndex);
-    }
-    key kID = (sOut + "-0000-0000-0000-000000000000");
+    key kID = llGenerateKey();
     llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
-        + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
     return kID;
 } 
 
