@@ -23,6 +23,10 @@ integer LM_SETTING_REQUEST = 2001;//when startup, scripts send requests for sett
 integer LM_SETTING_RESPONSE = 2002;//the httpdb script will send responses on this channel
 integer LM_SETTING_DELETE = 2003;//delete token from DB
 
+integer DIALOG = -9000;
+integer DIALOG_RESPONSE = -9001;
+integer DIALOG_TIMEOUT = -9002;
+
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
 
@@ -36,11 +40,21 @@ vector g_vColor;
 
 string g_sDBToken = "hovertext";
 
+key g_kTBoxId;
+
 key g_kWearer;
 
 Debug(string sMsg) {
     //llOwnerSay(llGetScriptName() + " (debug): " + sMsg);
 }
+
+key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+{
+    key kID = llGenerateKey();
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" 
+    + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kID);
+    return kID;
+} 
 
 Notify(key kID, string sMsg, integer iAlsoNotifyWearer) {
     if (kID == g_kWearer) {
@@ -98,6 +112,66 @@ vector GetTextPrimColor() {
     return llList2Vector( params, 0 ) ;
 }
 
+integer UserCommand(integer iNum, string sStr, key kID) {
+    if (iNum < COMMAND_OWNER || iNum > COMMAND_WEARER) return FALSE;
+    list lParams = llParseString2List(sStr, [" "], []);
+    string sCommand = llList2String(lParams, 0);
+    string sValue = llToLower(llList2String(lParams, 1));
+    if (sStr == "menu " + g_sFeatureName) {
+    g_kTBoxId = Dialog(kID, "Either:\n- Submit the new floating text in the field below,\n- enter ' ' (SPACE) to remove current text\n- or just submit a blank field to go back to " + g_sParentMenu + " menu.", [], [], 0, iNum);
+    } else if (sCommand == "text") {
+        //llSay(0, "got text command");
+        lParams = llDeleteSubList(lParams, 0, 0);//pop off the "text" command
+        string sNewText = llDumpList2String(lParams, " ");
+        if (g_iOn) {
+            //only change text if commander has smae or greater auth
+            if (iNum <= g_iLastRank) {
+                if (sNewText == "") {
+                    g_sText = "";
+                    HideText();
+                } else {
+                    ShowText(sNewText);
+                    g_iLastRank = iNum;
+                    //llMessageLinked(LINK_ROOT, LM_SETTING_SAVE, g_sDBToken + "=on:" + (string)iNum + ":" + llEscapeURL(sNewText), NULL_KEY);
+                }
+            } else {
+                Notify(kID,"You currently have not the right to change the float text, someone with a higher rank set it!", FALSE);
+            }
+        } else {
+            //set text
+            if (sNewText == "") {
+                g_sText = "";
+                HideText();
+            } else {
+                ShowText(sNewText);
+                g_iLastRank = iNum;
+                //llMessageLinked(LINK_ROOT, LM_SETTING_SAVE, g_sDBToken + "=on:" + (string)iNum + ":" + llEscapeURL(sNewText), NULL_KEY);
+            }
+        }
+    } else if (sCommand == "textoff") {
+        if (g_iOn) {
+            //only turn off if commander auth is >= g_iLastRank
+            if (iNum <= g_iLastRank) {
+                g_iLastRank = COMMAND_WEARER;
+                HideText();
+            }
+        } else {
+            g_iLastRank = COMMAND_WEARER;
+            HideText();
+        }
+    } else if (sCommand == "texton") {
+        if( g_sText != "") {
+            g_iLastRank = iNum;
+            ShowText(g_sText);
+        }
+    } else if (sStr == "reset" && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER)) {
+        g_sText = "";
+        HideText();
+        llResetScript();
+    }
+    return TRUE;
+}
+
 default {
     state_entry() {
         // find the text prim
@@ -135,73 +209,28 @@ default {
         }
     }
     link_message(integer iSender, integer iNum, string sStr, key kID) {
-        list lParams = llParseString2List(sStr, [" "], []);
-        string sCommand = llList2String(lParams, 0);
-        string sValue = llToLower(llList2String(lParams, 1));
-        if (iNum >= COMMAND_OWNER && iNum <= COMMAND_WEARER) {
-            if (sStr == "menu " + g_sFeatureName) {
-                //popup help on how to set label
-                llMessageLinked(LINK_ROOT, POPUP_HELP, "To set floating text , say _PREFIX_text followed by the text you wish to set.  \nExample: _PREFIX_text I have text above my head!", kID);
-                llMessageLinked(LINK_ROOT, iNum, "menu " + g_sParentMenu, kID);
-            } else if (sCommand == "text") {
-                //llSay(0, "got text command");
-                lParams = llDeleteSubList(lParams, 0, 0);//pop off the "text" command
-                string sNewText = llDumpList2String(lParams, " ");
-                if (g_iOn) {
-                    //only change text if commander has smae or greater auth
-                    if (iNum <= g_iLastRank) {
-                        if (sNewText == "") {
-                            g_sText = "";
-                            HideText();
-                        } else {
-                            ShowText(sNewText);
-                            g_iLastRank = iNum;
-                            //llMessageLinked(LINK_ROOT, LM_SETTING_SAVE, g_sDBToken + "=on:" + (string)iNum + ":" + llEscapeURL(sNewText), NULL_KEY);
-                        }
-                    } else {
-                        Notify(kID,"You currently have not the right to change the float text, someone with a higher rank set it!", FALSE);
-                    }
-                } else {
-                    //set text
-                    if (sNewText == "") {
-                        g_sText = "";
-                        HideText();
-                    } else {
-                        ShowText(sNewText);
-                        g_iLastRank = iNum;
-                        //llMessageLinked(LINK_ROOT, LM_SETTING_SAVE, g_sDBToken + "=on:" + (string)iNum + ":" + llEscapeURL(sNewText), NULL_KEY);
-                    }
-                }
-            } else if (sCommand == "textoff") {
-                if (g_iOn) {
-                    //only turn off if commander auth is >= g_iLastRank
-                    if (iNum <= g_iLastRank) {
-                        g_iLastRank = COMMAND_WEARER;
-                        HideText();
-                    }
-                } else {
-                    g_iLastRank = COMMAND_WEARER;
-                    HideText();
-                }
-            } else if (sCommand == "texton") {
-                if( g_sText != "") {
-                    g_iLastRank = iNum;
-                    ShowText(g_sText);
-                }
-            } else if (sStr == "reset" && (iNum == COMMAND_OWNER || iNum == COMMAND_WEARER)) {
-                g_sText = "";
-                HideText();
-                llResetScript();
-            }
+        if (UserCommand(iNum, sStr, kID)) {
+        } else if (iNum == DIALOG_RESPONSE) {
+            if (kID == g_kTBoxId) {
+                //got a menu response meant for us.  pull out values
+                list lMenuParams = llParseStringKeepNulls(sStr, ["|"], []);
+                key kAv = (key)llList2String(lMenuParams, 0);
+                string sMessage = llList2String(lMenuParams, 1);
+                integer iPage = (integer)llList2String(lMenuParams, 2);
+                integer iAuth = (integer)llList2String(lMenuParams, 3);
+                if (sMessage == " ") UserCommand(iAuth, "textoff", kAv);
+                else if (sMessage) UserCommand(iAuth, "text " + sMessage, kAv);
+                llMessageLinked(LINK_ROOT, iAuth, "menu " + g_sParentMenu, kAv);
+        }
         } else if (iNum == MENUNAME_REQUEST) {
             llMessageLinked(LINK_ROOT, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sFeatureName, NULL_KEY);
-        } else if (iNum == LM_SETTING_RESPONSE) {
-            lParams = llParseString2List(sStr, ["="], []);
-            string sToken = llList2String(lParams, 0);
-            Debug("sToken: " + sToken);
-            if (sToken == g_sDBToken) {
-                llMessageLinked(LINK_ROOT, LM_SETTING_DELETE, g_sDBToken , NULL_KEY);
-            }
+//        } else if (iNum == LM_SETTING_RESPONSE) {
+//            list lParams = llParseString2List(sStr, ["="], []);
+//            string sToken = llList2String(lParams, 0);
+//            Debug("sToken: " + sToken);
+//            if (sToken == g_sDBToken) {
+/// SA: here would be the place to restore setting from cached value 
+//            }
         }
     }
 

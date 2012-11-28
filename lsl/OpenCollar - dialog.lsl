@@ -232,10 +232,11 @@ Dialog(key kRecipient, string sPrompt, list lMenuItems, list lUtilityButtons, in
     {
         llDialog(kRecipient, sThisPrompt, PrettyButtons(lButtons, lUtilityButtons,[PREV,MORE]), iChan);      
     }
-    else
+    else if (iNumitems)
     {
         llDialog(kRecipient, sThisPrompt, PrettyButtons(lButtons, lUtilityButtons,[]), iChan);
-    }    
+    }
+    else llTextBox(kRecipient, sThisPrompt, iChan);
     integer ts = llGetUnixTime() + g_iTimeOut;
     g_lMenus += [iChan, kID, iListener, ts, kRecipient, sPrompt, llDumpList2String(lMenuItems, "|"), llDumpList2String(lUtilityButtons, "|"), iPage, iWithNums, iAuth];
 }
@@ -481,7 +482,7 @@ default
                 }
                 Dialog(kID, sPrompt, items, ubuttons, iPage, kMenuID, iDigits, iAuth);
             }
-            else if (sMessage == BLANK)
+            else if (sMessage == BLANK && items != [])
             
             {
                 //give the same menu back
