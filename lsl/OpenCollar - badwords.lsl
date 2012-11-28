@@ -39,15 +39,17 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-//5000 block is reserved for IM slaves
-
 key g_kWearer;
 
 key g_kDialog;
+key g_kMainDialog;
+key g_kAddBadwordTBox;
+key g_kRemBadwordDialog;
+key g_kSetAnimDialog;
+key g_kSetPenanceTBox;
+
 string g_sSubMenu = "Badwords";
 string g_sParentMenu = "AddOns";
-//string UPMENU = "?";
-//string MORE = "?";
 string UPMENU = "^";
 string g_sIsEnabled = "badwordson=false";
 
@@ -84,7 +86,7 @@ integer Enabled()
 DialogBadwords(key kID, integer iAuth)
 {
     string sText;
-    list lButtons = ["List Words", "Clear ALL", "Say Penance"];
+    list lButtons = ["Set Penance", "Add Word", "Remove Word", "Set Animation"];
     if(Enabled())
     {
         lButtons += ["OFF"];
@@ -95,23 +97,37 @@ DialogBadwords(key kID, integer iAuth)
         lButtons += ["ON"];
         sText += "Badwords are turned OFF.\n";
     }
-    sText += "'List Words' show you all badwords.\n";
-    sText += "'Clear ALL' will delete all set badwords.\n";
-    sText += "'Say Penance' will tell you the current penance phrase.\n";
-    sText += "'Quick Help' will give you a brief help how to add or remove badwords.\n";
-    lButtons += ["Quick Help"];
-    g_kDialog=Dialog(kID, sText, lButtons, [UPMENU],0, iAuth);
+    sText += "'Add Word' add another badword.\n";
+    sText += "'Remove Word' shows the list of badwords and allows removing them.\n";
+    sText += "'Set Animation' select the animation to use as a punishment.\n";
+    sText += "'Set Penance' write the penance the sub has to say to get released from the animation.\n";
+    g_kDialog = g_kMainDialog = Dialog(kID, sText, lButtons, [UPMENU],0, iAuth);
 }
 
-DialogHelp(key kID, integer iAuth)
+DialogRemBadword(key kID, integer iAuth) // short subroutine, but presented as a function as it needs to be called back again after an answer
 {
-    string sMessage = "Usage of Badwords.\n";
-    sMessage += "Put in front of each command your subs prefix then use them as followed:\n";
-    sMessage += "badword <badword> where <badword> is the word you want to add.\n";
-    sMessage += "rembadword <badword> where <badword> is the word you want to remove.\n";
-    sMessage += "penance <what your sub has to say to get release from the badword anim.\n";
-    sMessage += "badwordsanim <anim name> , make sure the animation is inside the collar.";
-    g_kDialog=Dialog(kID, sMessage, ["Ok"], [], 0, iAuth);
+    string sText = "Select a badword to remove or clear them all.";
+    g_kDialog = g_kRemBadwordDialog=Dialog(kID, sText, g_lBadWords, ["Clear All", UPMENU],0, iAuth);
+}
+
+DialogSelectAnim(key kID, integer iAuth)
+{
+    list lPoseList;
+    integer iMax = llGetInventoryNumber(INVENTORY_ANIMATION);
+    integer i;
+    string sName;
+    for (i=0;i<iMax;i++)
+    {
+        sName=llGetInventoryName(INVENTORY_ANIMATION, i);
+        //check here if the anim start with ~ or for some reason does not get a name returned (spares to check that all again in the menu ;)
+        if (sName != "" && llGetSubString(sName, 0, 0) != "~")
+        {
+            lPoseList+=[sName];
+        }
+    }
+    string sText = "Current punishment animation is: "+g_sBadWordAnim+"\n\n";
+    sText += "Select a new animation to use as a punishment.\n\n";
+    g_kDialog = g_kSetAnimDialog = Dialog(kID, sText, lPoseList, [UPMENU],0, iAuth);
 }
 
 ListenControl()
@@ -354,12 +370,7 @@ integer UserCommand(integer iNum, string sStr, key kID) // here iNum: auth value
 }
 
 default
-{     // no more needed
-    //  state_entry()
-    //  {
-    //      llSleep(0.8);
-    //      llMessageLinked(LINK_SET, MENUNAME_RESPONSE, g_sParentMenu + "|" + g_sSubMenu, NULL_KEY);
-    //  }
+{
     on_rez(integer iParam)
     {
         llResetScript();
@@ -397,11 +408,6 @@ default
                 g_sPenance = sValue;
             }
         }
-        // no more self - resets
-        //    else if ((iNum == COMMAND_OWNER || iNum == COMMAND_WEARER) && (sStr == "reset" || sStr == "runaway"))
-        //    {
-        //        llResetScript();
-        //    }
         else if (UserCommand(iNum, sStr, kID)) return;
         else if(iNum == COMMAND_SAFEWORD)
         { // safeword disables badwords !
@@ -419,37 +425,85 @@ default
 
         else if (iNum == DIALOG_RESPONSE)
         {
-            if(kID == g_kDialog)
+            if (g_kDialog != kID) return;
+            list lMenuParams = llParseStringKeepNulls(sStr, ["|"], []);
+            key kAv = (key)llList2String(lMenuParams, 0);
+            string sMessage = llList2String(lMenuParams, 1);
+            integer iPage = (integer)llList2String(lMenuParams, 2);
+            integer iAuth = (integer)llList2String(lMenuParams, 3);
+            if (kID == g_kMainDialog)
             {
-                list lMenuParams = llParseString2List(sStr, ["|"], []);
-                key kAv = (key)llList2String(lMenuParams, 0);
-                string sMessage = llList2String(lMenuParams, 1);
-                integer iPage = (integer)llList2String(lMenuParams, 2);
-                integer iAuth = (integer)llList2String(lMenuParams, 3);
                 if(sMessage == "Ok") {} // Do nothing, just pop up the main menu again.
                 else if (sMessage == UPMENU) 
                 {    //give kID the parent menu
                     llMessageLinked(LINK_SET, iAuth, "menu " + g_sParentMenu, kAv);
-                    return;
                 }
-                else if(sMessage == "Clear ALL") UserCommand(iAuth, "badwords clearall", kAv);
                 else if(sMessage == "ON")
                 {
                     UserCommand(iAuth, "badwords on", kAv);
+                    DialogBadwords(kAv, iAuth);                    
                 }
                 else if(sMessage == "OFF")
                 {
                     UserCommand(iAuth, "badwords off", kAv);
+                    DialogBadwords(kAv, iAuth);                    
                 }
-                else if(sMessage == "List Words")
+                else if (sMessage == "Add Word")
                 {
-                    Notify(kAv, "Badwords are: " + llDumpList2String(g_lBadWords, " or "),FALSE);
+                    string sText = "Write a badword to add or submit a blank text field to go back to menu.";
+                    g_kDialog = g_kAddBadwordTBox = Dialog(kAv, sText, [], [], 0, iAuth);
                 }
-                else if(sMessage == "Say Penance")
+                else if (sMessage == "Remove Word")
                 {
-                    Notify(kAv, "The penance phrase to release the sub from the punishment anim is:\n" + g_sPenance,FALSE);
+                    if (g_lBadWords) DialogRemBadword(kAv, iAuth);
+                    else
+                    {
+                        Notify(kAv, "The list of badwords is currently empty.", FALSE);
+                        DialogBadwords(kAv, iAuth);
+                    }
                 }
-                else if(sMessage == "Quick Help") { DialogHelp(kAv, iAuth); return; }
+                else if (sMessage == "Set Penance")
+                {
+                    string sText = "\nThe sub has to say the penance phrase to be released from the punishment.";
+                    sText += "\nCurrent penance is:\n>>  " + g_sPenance;
+                    sText += "\n\nWrite a new one in the field below or just submit a blank field to leave it unchanged.\n";
+                    g_kDialog = g_kSetPenanceTBox=Dialog(kAv, sText, [], [],0, iAuth);
+                }
+                else if (sMessage == "Set Animation") DialogSelectAnim(kAv, iAuth);
+            }
+            else if (kID == g_kAddBadwordTBox)
+            {
+                if (sMessage) UserCommand(iAuth, "badword " + sMessage, kAv);
+                DialogBadwords(kAv, iAuth);                    
+            }
+            else if (kID == g_kRemBadwordDialog)
+            {
+                if (sMessage == UPMENU) DialogBadwords(kAv, iAuth);                    
+                else if (sMessage == "Clear All")
+                {
+                    UserCommand(iAuth, "badwords clearall", kAv);
+                    DialogBadwords(kAv, iAuth);
+                }
+                else
+                {
+                    UserCommand(iAuth, "rembadword " + sMessage, kAv);
+                    if (g_lBadWords) DialogRemBadword(kAv, iAuth);
+                    else DialogBadwords(kAv, iAuth);
+                }
+            }
+            else if (kID == g_kSetAnimDialog)
+            {
+                if (sMessage == UPMENU) {} // nothing to do
+                else
+                {
+                    UserCommand(iAuth, "badwordsanim " + sMessage, kAv);
+                }
+                // in all cases 
+                DialogBadwords(kAv, iAuth);                    
+            }
+            else if (kID == g_kSetPenanceTBox)
+            {
+                if (sMessage) UserCommand(iAuth, "penance " + sMessage, kAv);
                 DialogBadwords(kAv, iAuth);                    
             }
         }

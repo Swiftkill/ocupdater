@@ -41,7 +41,7 @@ integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-integer iPagesize = 12;
+integer PAGE_SIZE = 12;
 string MORE = ">";
 string PREV = "<";
 string UPMENU = "^"; // string to identify the UPMENU button in the utility lButtons
@@ -167,7 +167,7 @@ Dialog(key kRecipient, string sPrompt, list lMenuItems, list lUtilityButtons, in
     list lCurrentItems;
     integer iNumitems = llGetListLength(lMenuItems);
     integer iStart;
-    integer iMyPageSize = iPagesize - llGetListLength(lUtilityButtons);
+    integer iMyPageSize = PAGE_SIZE - llGetListLength(lUtilityButtons);
         
     //slice the menuitems by page
     if (iNumitems > iMyPageSize)
@@ -232,7 +232,7 @@ Dialog(key kRecipient, string sPrompt, list lMenuItems, list lUtilityButtons, in
     {
         llDialog(kRecipient, sThisPrompt, PrettyButtons(lButtons, lUtilityButtons,[PREV,MORE]), iChan);      
     }
-    else if (iNumitems)
+    else if (iNumitems || iMyPageSize != PAGE_SIZE)
     {
         llDialog(kRecipient, sThisPrompt, PrettyButtons(lButtons, lUtilityButtons,[]), iChan);
     }
@@ -461,8 +461,8 @@ default
                 Debug((string)iPage);
                 //increase the page num and give new menu
                 iPage++;
-                integer thisiPagesize = iPagesize - llGetListLength(ubuttons) - 2;
-                if (iPage * thisiPagesize >= llGetListLength(items))
+                integer iThisPagesize = PAGE_SIZE - llGetListLength(ubuttons) - 2;
+                if (iPage * iThisPagesize >= llGetListLength(items))
                 {
                     iPage = 0;
                 }
@@ -476,13 +476,13 @@ default
 
                 if (iPage < 0)
                 {
-                    integer thisiPagesize = iPagesize - llGetListLength(ubuttons) - 2;
+                    integer iThisPagesize = PAGE_SIZE - llGetListLength(ubuttons) - 2;
 
-                    iPage = (llGetListLength(items)-1)/thisiPagesize;
+                    iPage = (llGetListLength(items)-1)/iThisPagesize;
                 }
                 Dialog(kID, sPrompt, items, ubuttons, iPage, kMenuID, iDigits, iAuth);
             }
-            else if (sMessage == BLANK && items != [])
+            else if (sMessage == BLANK && items != [] && ubuttons != [])
             
             {
                 //give the same menu back
