@@ -788,6 +788,17 @@ default
         if (iNum == COMMAND_NOAUTH)
         {
             integer iAuth = Auth((string)kID, FALSE);
+            // for @ support
+            if ((llGetSubString(sStr, 0, 0) == "@"))
+            {
+                if((iAuth==COMMAND_EVERYONE)||(iAuth==COMMAND_GROUP))
+                    return;
+                else
+                {
+                    sStr = llGetSubString(sStr, 1, -1);
+                }
+            }
+
             if ((iNum == COMMAND_OWNER || kID == g_kWearer) && (sStr=="reset"))
             {
                 Notify(kID, "The command 'reset' is deprecated. Please use 'runaway' to leave the owner and clear all settings or 'resetscripts' to only reset the script in the collar.", FALSE);
