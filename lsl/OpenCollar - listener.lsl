@@ -280,23 +280,33 @@ default
 
         }
         else
-        { //check for our prefix, or *
+        {   //check for our prefix, or *
             if (StartsWith(sMsg, g_sPrefix))
             {
                 //trim
                 sMsg = llGetSubString(sMsg, llStringLength(g_sPrefix), -1);
                 llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
             }
-            else if (llGetSubString(sMsg, 0, 0) == "*")
+            else 
             {
-                sMsg = llGetSubString(sMsg, 1, -1);
-                llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
-            }
-            // added # as prefix for all subs aroubd BUT yourself
-            else if ((llGetSubString(sMsg, 0, 0) == "#") && (kID != g_kWearer))
-            {
-                sMsg = llGetSubString(sMsg, 1, -1);
-                llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+                string cSign = llGetSubString(sMsg, 0, 0); // if first letter is..
+                if (cSign == "*")
+                {
+                    sMsg = llGetSubString(sMsg, 1, -1);
+                    llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+                }
+                // added # as prefix for all subs aroubd BUT yourself
+                else if ((cSign == "#") && (kID != g_kWearer))
+                {
+                    sMsg = llGetSubString(sMsg, 1, -1);
+                    llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+                }
+                // added @ prefix for all owned subs and yourself
+                else if (cSign == "@")
+                {
+                    // not removing sign, so Auth module will know to try change auth level
+                    llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+                }
             }
         }
     }
