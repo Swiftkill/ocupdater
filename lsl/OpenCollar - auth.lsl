@@ -40,6 +40,8 @@ integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
 integer COMMAND_RLV_RELAY = 507;
 integer COMMAND_SAFEWORD = 510;  // new for safeword
+// equal to COMMAND_NOAUTH if chat command with @ sent by non-owner
+integer COMMAND_AUTH_IF_OWNER = 511;  
 integer COMMAND_BLACKLIST = 520;
 // added so when the sub is locked out they can use postions
 integer COMMAND_WEARERLOCKEDOUT = 521;
@@ -785,19 +787,14 @@ default
 
     link_message(integer iSender, integer iNum, string sStr, key kID)
     {  //authenticate messages on COMMAND_NOAUTH
-        if (iNum == COMMAND_NOAUTH)
+        if ((iNum == COMMAND_NOAUTH) || (iNum == COMMAND_AUTH_IF_OWNER))
         {
             integer iAuth = Auth((string)kID, FALSE);
+            
             // for @ support
-            if ((llGetSubString(sStr, 0, 0) == "@"))
-            {
-                if((iAuth==COMMAND_EVERYONE)||(iAuth==COMMAND_GROUP))
-                    return;
-                else
-                {
-                    sStr = llGetSubString(sStr, 1, -1);
-                }
-            }
+            if (iNum == COMMAND_AUTH_IF_OWNER)
+                if((iAuth == COMMAND_EVERYONE) || (iAuth==COMMAND_GROUP))
+                    return; 
 
             if ((iNum == COMMAND_OWNER || kID == g_kWearer) && (sStr=="reset"))
             {
