@@ -24,6 +24,8 @@ integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
 integer COMMAND_RLV_RELAY = 507;
 integer COMMAND_SAFEWORD = 510;  // new for safeword
+// equal to COMMAND_NOAUTH if chat command with @ sent by non-owner
+integer COMMAND_AUTH_IF_OWNER = 511;
 //integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
@@ -304,8 +306,8 @@ default
                 // added @ prefix for all owned subs and yourself
                 else if (cSign == "@")
                 {
-                    // not removing sign, so Auth module will know to try change auth level
-                    llMessageLinked(LINK_SET, COMMAND_NOAUTH, sMsg, kID);
+                    sMsg = llGetSubString(sMsg, 1, -1);
+                    llMessageLinked(LINK_SET, COMMAND_AUTH_IF_OWNER, sMsg, kID);
                 }
             }
         }
