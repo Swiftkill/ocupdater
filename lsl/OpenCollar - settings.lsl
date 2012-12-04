@@ -106,7 +106,7 @@ list DelSetting(list cache, string token) {
     return cache;
 }
 
-DumpCache(key id) {
+DumpCache() {
     string sOut = "Settings: \n";
 
 
@@ -118,14 +118,14 @@ DumpCache(key id) {
         string sAdd = llList2String(settings_pairs, n) + "=" + llList2String(settings_pairs, n + 1) + "\n";
         if (llStringLength(sOut + sAdd) > 1024) {
             //spew and clear
-            Notify(id, "\n" + sOut, FALSE);
+            llWhisper(0, "\n" + sOut);
             sOut = sAdd;
         } else {
             //keep adding
             sOut += sAdd;
         }
     }
-    Notify(id, "\n" + sOut, FALSE);
+    llWhisper(0, "\n" + sOut);
 }
 
 SendValues() {
@@ -258,8 +258,8 @@ default {
             else if (str == "menu "+WIKI) {loadurl = TRUE; remenu = TRUE;}
             else if (num == COMMAND_OWNER || id == wearer)
             {
-                if (str == "cachedump") DumpCache(id);
-                else if (str == "menu "+DUMPCACHE) { DumpCache(id); remenu = TRUE; }
+                if (str == "cachedump") DumpCache();
+                else if (str == "menu "+DUMPCACHE) { DumpCache(); remenu = TRUE; }
                 else if (str == "reset" || str == "runaway") llResetScript();
                 else return;
             }
