@@ -1,5 +1,8 @@
-//Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
+// Template for creating a OpenCollar Plugin
+// API Version: 3.8
+
 //Collar Cuff Menu
+// Licensed under the GPLv2, with the additional requirement that these scripts remain "full perms" in Second Life.  See "OpenCollar License" for details.
 
 //=============================================================================
 //== OC Cuff - Command forwarder to listen for commands in OpenCollar
@@ -11,10 +14,9 @@
 //==
 //==
 //=============================================================================
-
-integer g_nCmdChannel    = -190890;        // command channel for sending commands to the main cuff
-integer    g_nCmdHandle    = 0;            // command listen handler
-integer g_nCmdChannelOffset = 0xCC0CC;       // offset to be used to make sure we do not interfere with other items using the same technique for
+integer g_nCmdChannel    = -190890;     // command channel for sending commands to the main cuff
+integer g_nCmdHandle    = 0;            // command listen handler
+integer g_nCmdChannelOffset = 0xCC0CC;  // offset to be used to make sure we do not interfere with other items using the same technique for
 
 // Commands to be send to the Cuffs
 string g_szOwnerChangeCmd="OwnerChanged";
@@ -24,18 +26,17 @@ string g_szCuffMenuCmd="CuffMenu";
 string g_szSwitchHideCmd="ShowHideCuffs";
 string g_szSwitchLockCmd="SwitchLock";
 
+
+
 integer g_nRecolor=FALSE; // only send color values on demand
 integer g_nRetexture=FALSE; // only send texture values on demand
 
 float g_fMinVersion=3.750;
-
-string submenu = "Cuffs";
-string parentmenu = "AddOns";
-
-key g_keyDialogID;
-
-list localbuttons = ["Cuff Menu","Upd. Colors", "Upd. Textures", "(Un)Lock Cuffs", "Show/Hide"];
-list buttons;
+string g_sSubmenu = "Cuffs"; // Name of the submenu
+string g_sParentmenu = "AddOns"; // name of the menu, where the menu plugs in, should be usually Addons. Please do not use the mainmenu anymore
+key g_kMenuID;  // menu handler
+list g_lLocalbuttons = ["Cuff Menu","Upd. Colors", "Upd. Textures", "(Un)Lock Cuffs", "Show/Hide"]; // any local, not changing buttons which will be used in this plugin, leave empty or add buttons as you like
+list g_lButtons;
 
 string g_szPrefix; // sub prefix for databse actions
 
@@ -46,36 +47,51 @@ string g_szCollarMenuInfo="OpenCollar_ShowMenu"; // command for the collar to sh
 
 integer g_nLastRLVChange=-1;
 
-list g_lstResetOnOwnerChange=["OpenCollar - auth - 3.","OpenCollar - httpdb - 3.","OpenCollar - settings - 3."]; // scripts to be reseted on ownerchanges to keep system in sync
 
-// chat command for opening the mnu of the cuffs directly
-string g_szOpenCuffMenuCommand="cuffmenu";
-
-// variables for automativ updating collor and appearance in the cuffs
 string g_szUpdateActive_ON ="Sync On";
 string g_szUpdateActive_OFF ="Sync Off";
 string g_szUpdateActive_DBsave="cuffautosync";
-integer g_nUpdateActive= TRUE;
 
-// preparation for online mode
+
+integer g_nUpdateActive = FALSE;
+
+// Please agressively remove any unneeded code sections to save memory and sim time
+string g_sChatCommand = "cuffmenu"; // every menu should have a chat command, so the user can easily access it by type for instance *plugin
+
+integer g_iDebugMode=TRUE; // set to TRUE to enable Debug messages
+
+
 string g_szOnlineModeCommand="online";
 integer g_nOnline=FALSE; // For 3.7 there IS no 'online' mode
 
-key wearer;
+key g_kWearer; // key of the current wearer to reset only on owner changes
 
 string g_szScriptIdentifier="OpenCollar - cuffs -"; // for checking if already an older version of theis scrip is in the collar
 
-//MESSAGE MAP
-integer COMMAND_NOAUTH = 0;
+
+//OpenCollar MESSAGE MAP
+
+// messages for authenticating users
+integer COMMAND_NOAUTH = 0; // for reference, but should usually not be in use inside plugins
 integer COMMAND_OWNER = 500;
 integer COMMAND_SECOWNER = 501;
 integer COMMAND_GROUP = 502;
 integer COMMAND_WEARER = 503;
 integer COMMAND_EVERYONE = 504;
 integer COMMAND_RLV_RELAY = 507;
-integer COMMAND_SAFEWORD = 510;  // new for safeword
+integer COMMAND_SAFEWORD = 510;
+integer COMMAND_RELAY_SAFEWORD = 511;
+integer COMMAND_BLACKLIST = 520;
+// added for timer so when the sub is locked out they can use postions
+integer COMMAND_WEARERLOCKEDOUT = 521;
 
-//integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bt of lag caused by having IM slave scripts
+integer ATTACHMENT_REQUEST = 600;
+integer ATTACHMENT_RESPONSE = 601;
+integer ATTACHMENT_FORWARD = 610;
+
+integer WEARERLOCKOUT=620;//turns on and off wearer lockout
+
+//integer SEND_IM = 1000; deprecated.  each script should send its own IMs now.  This is to reduce even the tiny bit of lag caused by having IM slave scripts
 integer POPUP_HELP = 1001;
 
 // messages for storing and retrieving values from settings store
@@ -87,14 +103,21 @@ integer LM_SETTING_DELETE = 2003;//delete token from settings store
 integer LM_SETTING_EMPTY = 2004;//sent by settings script when a token has no value in the settings store
 integer LM_SETTING_REQUEST_NOCACHE = 2005;
 
+// messages for creating OC menu structure
 integer MENUNAME_REQUEST = 3000;
 integer MENUNAME_RESPONSE = 3001;
 integer MENUNAME_REMOVE = 3003;
 
+// messages for RLV commands
 integer RLV_CMD = 6000;
 integer RLV_REFRESH = 6001;//RLV plugins should reinstate their restrictions upon receiving this message.
 integer RLV_CLEAR = 6002;//RLV plugins should clear their restriction lists upon receiving this message.
+integer RLV_VERSION = 6003; //RLV Plugins can recieve the used rl viewer version upon receiving this message..
 
+integer RLV_OFF = 6100; // send to inform plugins that RLV is disabled now, no message or key needed
+integer RLV_ON = 6101; // send to inform plugins that RLV is enabled now, no message or key needed
+
+// messages for poses and couple anims
 integer ANIM_START = 7000;//send this with the name of an anim in the string part of the message to play the anim
 integer ANIM_STOP = 7001;//send this with the name of an anim in the string part of the message to stop the anim
 integer CPLANIM_PERMREQUEST = 7002;//id should be av's key, str should be cmd name "hug", "kiss", etc
@@ -102,37 +125,40 @@ integer CPLANIM_PERMRESPONSE = 7003;//str should be "1" for got perms or "0" for
 integer CPLANIM_START = 7004;//str should be valid anim name.  id should be av
 integer CPLANIM_STOP = 7005;//str should be valid anim name.  id should be av
 
-integer ATTACHMENT_REQUEST = 600;
-integer ATTACHMENT_RESPONSE = 601;
-integer ATTACHMENT_FORWARD = 610;
-
+// messages to the dialog helper
 integer DIALOG = -9000;
 integer DIALOG_RESPONSE = -9001;
 integer DIALOG_TIMEOUT = -9002;
 
-
+// menu option to go one step back in menustructure
 string UPMENU = "^";//when your menu hears this, give the parent menu
 
-key ShortKey()
-{//just pick 8 random hex digits and pad the rest with 0.  Good enough for dialog uniqueness.
-    string chars = "0123456789abcdef";
-    integer length = 16;
-    string out;
+//===============================================================================
+//= parameters   :    key   kRCPT  recipient of the dialog
+//=                   string  sPrompt    dialog prompt
+//=                   list  lChoices    true dialog buttons
+//=                   list  lUtilityButtons  utility buttons (kept on every iPage)
+//=                   integer   iPage    Page to be display
+//=
+//= return        :    key  handler of the dialog
+//=
+//= description  :    displays a dialog to the given recipient
+//=
+//===============================================================================
+key Dialog(key kRCPT, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth)
+{
+    string sChars = "0123456789abcdef";
+    integer iLength = 16;
+    string sOut;
     integer n;
     for (n = 0; n < 8; n++)
     {
-        integer index = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
-        out += llGetSubString(chars, index, index);
+        integer iIndex = (integer)llFrand(16);//yes this is correct; an integer cast rounds towards 0.  See the llFrand wiki entry.
+        sOut += llGetSubString(sChars, iIndex, iIndex);
     }
-     
-    return (key)(out + "-0000-0000-0000-000000000000");
-}
-
-key Dialog(key rcpt, string prompt, list choices, list utilitybuttons, integer page, integer iAuth)
-{
-    key id = ShortKey();
-    llMessageLinked(LINK_SET, DIALOG, (string)rcpt + "|" + prompt + "|" + (string)page + "|" + llDumpList2String(choices, "`") + "|" + llDumpList2String(utilitybuttons, "`") + "|" + (string)iAuth, id);
-    return id;
+    key kID = (key)(sOut + "-0000-0000-0000-000000000000");
+    llMessageLinked(LINK_SET, DIALOG, (string)kRCPT + "|" + sPrompt + "|" + (string)iPage + "|" + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`" + "|" + (string)iAuth), kID);
+    return kID;
 }
 
 
@@ -180,8 +206,6 @@ integer VersionOK()
     }
     return FALSE;
 }
-
-
 //===============================================================================
 //= parameters   :    string    szMsg   message string received
 //=
@@ -194,9 +218,9 @@ integer VersionOK()
 
 Debug(string szMsg)
 {
-    //llOwnerSay(llGetScriptName() + ": " + szMsg);
+    //if (!g_iDebugMode) return;
+    //llOwnerSay(llGetScriptName() + ": " + sMsg);
 }
-
 //===============================================================================
 //= parameters   :  integer nOffset        Offset to make sure we use really a unique channel
 //=
@@ -206,7 +230,7 @@ Debug(string szMsg)
 //===============================================================================
 integer nGetOwnerChannel(integer nOffset)
 {
-    integer chan = (integer)("0x"+llGetSubString((string)wearer,3,8)) + g_nCmdChannelOffset;
+    integer chan = (integer)("0x"+llGetSubString((string)g_kWearer,3,8)) + g_nCmdChannelOffset;
     if (chan>0)
     {
         chan=chan*(-1);
@@ -217,6 +241,7 @@ integer nGetOwnerChannel(integer nOffset)
     }
     return chan;
 }
+
 //===============================================================================
 //= parameters   :    string    szMsg   message string received
 //=
@@ -232,6 +257,38 @@ integer nStartsWith(string szHaystack, string szNeedle) // http://wiki.secondlif
 }
 
 //===============================================================================
+//= parameters   :    string    keyID   key of person requesting the menu
+//=
+//= return        :    none
+//=
+//= description  :    build menu and display to user
+//=
+//===============================================================================
+
+
+DoMenu(key keyID, integer iAuth)
+{
+    string sPrompt = "Pick an option.\n";
+    list lMyButtons = g_lLocalbuttons + g_lButtons;
+
+    if (g_nUpdateActive)
+    {
+        sPrompt += " Colors and textures will be sycronized automatically to your cuffs, when you change them on the collar.";
+        lMyButtons+=[g_szUpdateActive_OFF];
+    }
+    else
+    {
+        sPrompt += " Colors and textures will NOT be sycronized automatically to your cuffs, when you change them on the collar.";
+        lMyButtons+=[g_szUpdateActive_ON];
+    }
+
+    //fill in your button list and additional prompt here
+    lMyButtons = llListSort(lMyButtons, 1, TRUE); // resort menu buttons alphabetical
+
+    // and dispay the menu
+    g_kMenuID = Dialog(keyID, sPrompt, lMyButtons, [UPMENU], 0, iAuth);
+}
+//===============================================================================
 //= parameters   :   string    szColorString   string with objectnames and colors
 //=
 //= return        :    none
@@ -241,7 +298,6 @@ integer nStartsWith(string szHaystack, string szNeedle) // http://wiki.secondlif
 //=
 //===============================================================================
 
-
 SendRecoloring (string szColorString)
 {
     list lstColorList=llParseString2List(szColorString, ["~"], []);
@@ -249,9 +305,8 @@ SendRecoloring (string szColorString)
     integer i;
     for (i=0;i<nColorCount;i=i+2)
     {
-        llRegionSay(g_nCmdChannel,"occ|*|"+g_szColorChangeCmd+"="+llList2String(lstColorList,i)+"="+llList2String(lstColorList,i+1)+"|" + (string)wearer);
+        llRegionSay(g_nCmdChannel,"occ|*|"+g_szColorChangeCmd+"="+llList2String(lstColorList,i)+"="+llList2String(lstColorList,i+1)+"|" + (string)g_kWearer);
     }
-
 }
 
 //===============================================================================
@@ -264,7 +319,6 @@ SendRecoloring (string szColorString)
 //=
 //===============================================================================
 
-
 SendRetexturing (string szTextureString)
 {
     list lstTextureList=llParseString2List(szTextureString, ["~"], []);
@@ -272,10 +326,12 @@ SendRetexturing (string szTextureString)
     integer i;
     for (i=0;i<nTextureCount;i=i+2)
     {
-        llRegionSay(g_nCmdChannel,"occ|*|"+g_szTextureChangeCmd+"="+llList2String(lstTextureList,i)+"="+llList2String(lstTextureList,i+1)+"|" + (string)wearer);
+        llRegionSay(g_nCmdChannel,"occ|*|"+g_szTextureChangeCmd+"="+llList2String(lstTextureList,i)+"="+llList2String(lstTextureList,i+1)+"|" + (string)g_kWearer);
     }
-
 }
+
+
+
 //===============================================================================
 //= parameters   :   string    szMsg   message string received
 //=
@@ -285,7 +341,6 @@ SendRetexturing (string szTextureString)
 //=                    analyzes if the save would need any update in th cuffs
 //=
 //===============================================================================
-
 Analyse_LM_SETTING_Save(string szMsg)
 {
 
@@ -299,31 +354,25 @@ Analyse_LM_SETTING_Save(string szMsg)
     {
         if (g_nOnline)
         {
-            // owner right have been changed,, inform the cuffs
-            llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"="+szToken+"|" + (string)wearer);
-        }
+        	// owner right have been changed,, inform the cuffs
+        	llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"="+szToken+"|" + (string)g_kWearer);
+	}
     }
     else if (g_nUpdateActive && (szToken==g_szPrefix+"colorsettings"))
     {
 
         // for now active updating on every click is not in use
-
         // owner right have been changed,, inform the cuffs
         SendRecoloring(szValue);
-
 
     }
     else if (g_nUpdateActive && (szToken==g_szPrefix+"textures"))
     {
         // for now active updating on every click is not in use
-
         // owner right have been changed,, inform the cuffs
         SendRetexturing(szValue);
-
     }
-
 }
-
 
 //===============================================================================
 //= parameters   :   string    szMsg   message string received
@@ -340,11 +389,9 @@ Analyse_LM_SETTING_Delete(string szMsg)
     if ((szMsg=="owner")||(szMsg=="secowners")||(szMsg=="group")||(szMsg=="openaccess")||(szMsg=="blacklist"))
     {
         // owner right have been changed,, inform the cuffs
-        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"="+szMsg+"|" + (string)wearer);
+        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"="+szMsg+"|" + (string)g_kWearer);
     }
-
 }
-
 
 //===============================================================================
 //= parameters   :   none
@@ -354,7 +401,6 @@ Analyse_LM_SETTING_Delete(string szMsg)
 //= description  :    display an error message if more than one plugin of the same version is found
 //=
 //===============================================================================
-
 DoubleScriptCheck()
 {
     integer l=llStringLength(g_szScriptIdentifier)-1;
@@ -376,338 +422,314 @@ DoubleScriptCheck()
     }
 }
 
+//===============================================================================
+//= parameters   :    iNum: integer parameter of link message (avatar auth level)
+//=                   sStr: string parameter of link message (command name)
+//=                   kID: key parameter of link message (user key, usually)
+//=
+//= return        :   TRUE if the command was handled, FALSE otherwise
+//=
+//= description  :    handles user chat commands (also used as backend for menus)
+//=
+//===============================================================================
 
-ScriptReseter()
+integer UserCommand(integer iNum, string sStr, key kID)
 {
-    integer i;
-    integer j;
-    integer nMaxScripts=llGetInventoryNumber(INVENTORY_SCRIPT);
-    integer nMaxResetScripts=llGetListLength(g_lstResetOnOwnerChange);
-    string sz_CurrentScript;
-    for (i=0;i<nMaxScripts;i++)
+    if (!(iNum >= COMMAND_OWNER && iNum <= COMMAND_WEARER)) return FALSE;
+    // a validated command from a owner, secowner, groupmember or the wearer has been received
+    // can also be used to listen to chat commands
+    list lParams = llParseString2List(sStr, [" "], []);
+    string sCommand = llToLower(llList2String(lParams, 0));
+    string sValue = llToLower(llList2String(lParams, 1));
+    // So commands can accept a value
+    if (sStr == "reset")
+        // it is a request for a reset
     {
-        sz_CurrentScript=llGetInventoryName(INVENTORY_SCRIPT,i);
-        for (j=0;j<nMaxResetScripts;j++)
-        {
-            if (nStartsWith(sz_CurrentScript,llList2String(g_lstResetOnOwnerChange,j)))
-            {
-                llResetOtherScript(sz_CurrentScript);
-                llSleep(1.5);
-            }
+        if (iNum == COMMAND_WEARER || iNum == COMMAND_OWNER)
+        {   //only owner and wearer may reset
+            llResetScript();
         }
     }
+    else if (sStr == g_sChatCommand || sStr == "menu " + g_sSubmenu)
+        // an authorized user requested the plugin menu by typing the menus chat command
+    {
+        DoMenu(kID, iNum);
+    }
+    else if (sStr == g_sChatCommand)
+        // send command to cuffs to open menu command on chat menu received my the collar
+    {
+        // Send open command to cuff
+        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szCuffMenuCmd+"="+(string)kID+"|" +(string)g_kWearer);
+    }
+    else if (sStr == "rlvon" )
+    {
+        if(llGetUnixTime()>g_nLastRLVChange+10)
+        {
+            llRegionSay(g_nCmdChannel,"occ|*|"+g_szRLVChangeFromCollarInfo+"=on="+(string)kID+"|" + (string)g_kWearer);
+        }
+    }
+    else if (iNum == COMMAND_SAFEWORD )
+        // safeword has been issued
+    {
+        llRegionSay(g_nCmdChannel,"occ|*|SAFEWORD|" + (string)g_kWearer);
+    }
+    else if ( (sStr=="runaway") && (iNum ==COMMAND_OWNER || kID == g_kWearer) )
+    {
+        // owner right have been changed,, inform the cuffs
+        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"=owner|" + (string)g_kWearer);
+    }
+    else if (iNum == COMMAND_OWNER)
+        // check if a owner command comes through and if it is about enabling RLV
+    {
+        if (sStr == "rlvoff" )
+            if(llGetUnixTime()>g_nLastRLVChange+10)
+            {
+                llRegionSay(g_nCmdChannel,"occ|*|"+g_szRLVChangeFromCollarInfo+"=off="+(string)kID+"|" + (string)g_kWearer);
+            }
+    }
 
+    return TRUE;
 }
 
-DoMenu(key id, integer iAuth)
-{
-    string prompt = "Pick an option.";
-
-    list mybuttons = localbuttons + buttons;
-
-    //fill in your button list here
-
-
-    if (g_nUpdateActive)
-    {
-        prompt += " Colors and textures will be sycronized automatically to your cuffs, when you change them on the collar.";
-        mybuttons+=[g_szUpdateActive_OFF];
-    }
-    else
-    {
-        prompt += " Colors and textures will NOT be sycronized automatically to your cuffs, when you change them on the collar.";
-        mybuttons+=[g_szUpdateActive_ON];
-    }
-    g_keyDialogID=Dialog(id, prompt, mybuttons, [UPMENU],0, iAuth);
-}
-
-
-
-
+//===============================================================================
+//= parameters   :    none
+//=
+//= return        :   string     DB prefix from the description of the collar
+//=
+//= description  :    prefix from the description of the collar
+//=
+//===============================================================================
 string GetDBPrefix()
 {//get db prefix from list in object desc
     return llList2String(llParseString2List(llGetObjectDesc(), ["~"], []), 2);
 }
 
-
 default
 {
     state_entry()
     {
-        if (!VersionOK()) state WrongVersion;
-        
-        wearer=llGetOwner();
+        // store key of wearer
+        g_kWearer = llGetOwner();
 
         DoubleScriptCheck();
-
         g_nCmdChannel= nGetOwnerChannel(g_nCmdChannelOffset);
-
-        // wait for all scripst to be ready
-        llSleep(1.0);
-
-        // any submenu want to register?
-        llMessageLinked(LINK_THIS, MENUNAME_REQUEST, submenu, NULL_KEY);
-
-        // include ourselft into parent menu
-        llMessageLinked(LINK_THIS, MENUNAME_RESPONSE, parentmenu + "|" + submenu, NULL_KEY);
-
-        //get dbprefix from object desc, so that it doesn't need to be hard coded, and scripts between differently-primmed collars can be identical
         g_szPrefix = GetDBPrefix();
-
-        // How is our memory?
-        Debug("Available memory for "+llGetScriptName()+": "+(string)llGetFreeMemory());
+        // sleep a second to allow all scripts to be initialized
+        llSleep(1.0);
+        // send request to main menu and ask other menus if they want to register with us
+        llMessageLinked(LINK_THIS, MENUNAME_REQUEST, g_sSubmenu, NULL_KEY);
+        llMessageLinked(LINK_THIS, MENUNAME_RESPONSE, g_sParentmenu + "|" + g_sSubmenu, NULL_KEY);
     }
 
-    on_rez(integer param)
+    // Reset the script if wearer changes. By only reseting on owner change we can keep most of our
+    // configuration in the script itself as global variables, so that we don't loose anything in case
+    // the settings store isn't available, and also keep settings that were not sent to that store
+    // in the first place.
+    // Cleo: As per Nan this should be a reset on every rez, this has to be handled as needed, but be prepared that the user can reset your script anytime using the OC menus
+    on_rez(integer iParam)
     {
-        llResetScript();
-    }
-
-    attach(key id)
-    {
-        if (id == NULL_KEY)
-            // any last words?
+        if (llGetOwner()!=g_kWearer)
         {
-
+            // Reset if wearer changed
+            llResetScript();
         }
     }
 
-    link_message(integer sender, integer num, string str, key id)
+
+    // listen for linked messages from OC scripts
+    link_message(integer iSender, integer iNum, string sStr, key kID)
     {
-        if (num == MENUNAME_REQUEST && str == parentmenu)
+        if (iNum == MENUNAME_REQUEST && sStr == g_sParentmenu)
+            // our parent menu requested to receive buttons, so send ours
         {
-            llMessageLinked(LINK_THIS, MENUNAME_RESPONSE, parentmenu + "|" + submenu, NULL_KEY);
+
+            llMessageLinked(LINK_THIS, MENUNAME_RESPONSE, g_sParentmenu + "|" + g_sSubmenu, NULL_KEY);
         }
-        else if (num == MENUNAME_RESPONSE)
+        else if (iNum == MENUNAME_RESPONSE)
+            // a button is send to be added to a menu
         {
-            list parts = llParseString2List(str, ["|"], []);
-            if (llList2String(parts, 0) == submenu)
+            list lParts = llParseString2List(sStr, ["|"], []);
+            if (llList2String(lParts, 0) == g_sSubmenu)
             {//someone wants to stick something in our menu
-                string button = llList2String(parts, 1);
-                if (llListFindList(buttons, [button]) == -1)
+                string button = llList2String(lParts, 1);
+                if (llListFindList(g_lButtons, [button]) == -1)
+                    // if the button isnt in our menu yet, than we add it
                 {
-                    buttons = llListSort(buttons + [button], 1, TRUE);
+                    g_lButtons = llListSort(g_lButtons + [button], 1, TRUE);
                 }
             }
         }
-        else if (num == LM_SETTING_RESPONSE)
+        else if (iNum == LM_SETTING_RESPONSE)
+            // response from setting store have been received
         {
-            list params = llParseString2List(str, ["="], []);
-            string token = llList2String(params, 0);
-            string value = llList2String(params, 1);
-            if ((g_nRecolor)&&(token == g_szPrefix+"colorsettings"))
+            // pares the answer
+            list lParams = llParseString2List(sStr, ["="], []);
+            string sToken = llList2String(lParams, 0);
+            string sValue = llList2String(lParams, 1);
+
+            Debug("LMSETTINGSRESPONSE: "+sStr);
+            if ((g_nRecolor)&&(sToken == g_szPrefix+"colorsettings") )
             {
-                llOwnerSay("Recoloring:"+value);
-                SendRecoloring(value);
+                // work with the received values
+                llOwnerSay("Recoloring:"+sValue);
+                SendRecoloring(sValue);
                 g_nRecolor=FALSE;
             }
-            else if ((g_nRetexture)&&(token == g_szPrefix+"textures"))
+            else if ((g_nRetexture)&&(sToken == g_szPrefix+"textures"))
             {
-                SendRetexturing(value);
+                llOwnerSay("Retexturing:"+sValue);
+                SendRetexturing(sValue);
                 g_nRetexture=FALSE;
             }
-            else if (token == g_szPrefix+g_szUpdateActive_DBsave)
+            // or check for specific values from the collar like "owner" (for owners) "secowners" (or secondary owners) etc
+             else if (sToken == g_szPrefix+g_szUpdateActive_DBsave)
             {
-                g_nUpdateActive=(integer)value;
+                g_nUpdateActive=(integer)sValue;
             }
-            else if (token==g_szOnlineModeCommand)
+            else if (sToken == g_szOnlineModeCommand)
                 // is the collar in online mode?
             {
-                if (value=="1")
+                if (sValue == "1")
                 {
-                    g_nOnline=TRUE;
+                    g_nOnline = TRUE;
                 }
                 else
                 {
-                    g_nOnline=FALSE;
+                    g_nOnline = FALSE;
                 }
-
             }
 
         }
-        else if (num == LM_SETTING_SAVE)
+        else if (iNum == LM_SETTING_SAVE)
         {
-            // the collar saves to the settings store, so anaylye the command
-            Analyse_LM_SETTING_Save(str);
+            // the collar saves to the DB, so anaylye the command
+            Analyse_LM_SETTING_Save(sStr);
         }
-        else if (num == LM_SETTING_DELETE)
+        else if (iNum == LM_SETTING_DELETE)
         {
-            // the collar deletes from the settings store, so anaylye the command
-            Analyse_LM_SETTING_Delete(str);
+            // the collar saves to the DB, so anaylye the command
+            Analyse_LM_SETTING_Delete(sStr);
         }
-        else if (num == ATTACHMENT_FORWARD)
-        {
-            if (llGetOwnerKey(id)==wearer)
+        else if (iNum == ATTACHMENT_FORWARD)
+        { // object status changes forwarding
+            list lParams = llParseString2List(sStr, ["="], []);
+            string sToken = llList2String(lParams, 0);
+            string sValue = llList2String(lParams, 1);
+            if (llGetOwnerKey(kID)==g_kWearer)
             {
-                if (nStartsWith(str,g_szOwnerChangeCollarInfo))
-                    // an message from an object has been received, is it the cuff inform  about an owner change?
+                if (sToken == g_szOwnerChangeCollarInfo)
                 {
-                    if (g_nOnline)
-                    {
-                        // to properly handle onwerchnages we have to reset the httpdb so it reparses the seetings and the auth scripts
-                        llOwnerSay("Setting in the owner system changed, reloading to syncronize!");
-                        // now for resetting
-                        ScriptReseter();
-                    }
-                    else
-                    {
-                        llOwnerSay("The owners of your cuffs changed, but will not be kept in sync as your collar is in offline modus!");
-                    }
+                    Debug("OWNERINFO:"+ g_szOwnerChangeCollarInfo);
+                    llOwnerSay("The owners of your cuffs changed, but will not be kept in sync.");
                 }
-                else if (nStartsWith(str,g_szRLVChangeToCollarInfo))
-                    // an message from an object has been received, is it the cuff inform  about an RLV change?
+                else if (sToken == g_szRLVChangeToCollarInfo)
                 {
-                    // to properly handle changes we run the command through the auth system
-                    list lstCmdList = llParseString2List( str, [ "=" ], [] );
-                    if (llList2String(lstCmdList,1)=="on")
+                    if (sValue=="on")
                     {
-                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "rlvon", llList2Key(lstCmdList,2));
+                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "rlvon", llList2Key(lParams,2));
 
                     }
                     else
                     {
-                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "rlvoff", llList2Key(lstCmdList,2));
-
+                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "rlvoff", llList2Key(lParams,2));
                     }
                     g_nLastRLVChange=llGetUnixTime();
                 }
-                else if (nStartsWith(str,g_szCollarMenuInfo))
-                    // an message from an object has been received, is it the cuff inform they want to see the collar menu
+                else if (sToken == g_szCollarMenuInfo)
                 {
                     // to properly handle changes we run the command through the auth system
-                    list lstCmdList = llParseString2List( str, [ "=" ], [] );
-                    if (llList2String(lstCmdList,1)=="on")
-                    {
-                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "menu", llList2Key(lstCmdList,2));
-                    }
+                    // check this?
+                    if (sValue=="on")
+                        llMessageLinked(LINK_THIS, COMMAND_NOAUTH, "menu",  llList2Key(lParams,2));
+                    return;
                 }
             }
         }
-
-        // check for RLV changes from auth system
-        else if (num >= COMMAND_OWNER && num <= COMMAND_WEARER)
-            // check if a owner command comes through and if it is about disabling RLV
+        else if (UserCommand(iNum, sStr, kID)) {} // do nothing more if TRUE
+        else if (iNum == COMMAND_SAFEWORD)
+            // Safeword has been received, release any restricitions that should be released
         {
-            if (str == "rlvon" )
-            {
-                if(llGetUnixTime()>g_nLastRLVChange+10)
-                {
-                    llRegionSay(g_nCmdChannel,"occ|*|"+g_szRLVChangeFromCollarInfo+"=on="+(string)id+"|" + (string)wearer);
-                }
-            }
-            else if (str == "refreshmenu")
-            {
-                buttons = [];
-                llMessageLinked(LINK_SET, MENUNAME_REQUEST, submenu, NULL_KEY);
-
-            }
-            else if (str == llToLower(submenu)||str == "menu "+submenu)
-                // open Collar Cuff menu on chatcommand
-            {
-                DoMenu(id, num);
-            }
-            else if (str == g_szOpenCuffMenuCommand)
-                // send command to cuffs to open menu command on chat menu received my the collar
-            {
-                // Send open command to cuff
-                llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szCuffMenuCmd+"="+(string)id+"|" +(string)wearer);
-            }
-            else if ( (str=="runaway") && (num ==COMMAND_OWNER || id == wearer) )
-            {
-                if (g_nOnline)
-                {
-                    // owner right have been changed,, inform the cuffs
-                    llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szOwnerChangeCmd+"=owner|" + (string)wearer);
-                }
-            }
-
-            else if (num == COMMAND_OWNER)
-                // check if a owner command comes through and if it is about enabling RLV
-            {
-                if (str == "rlvoff" )
-                {
-                    if(llGetUnixTime()>g_nLastRLVChange+10)
-                    {
-                        llRegionSay(g_nCmdChannel,"occ|*|"+g_szRLVChangeFromCollarInfo+"=off="+(string)id+"|" + (string)wearer);
-                    }
-                }
-            }
+            Debug("Safeword received, releasing the subs restricions as needed");
+            llRegionSay(g_nCmdChannel,"occ|*|SAFEWORD|" + (string)g_kWearer);
         }
-        else if (num == COMMAND_SAFEWORD )
-            // safeword has been issued
+        else if (iNum == DIALOG_RESPONSE)
+            // answer from menu system
+            // careful, don't use the variable kID to identify the user, it is the UUID we generated when calling the dialog
+            // you have to parse the answer from the dialog system and use the parsed variable kAv
         {
-            llRegionSay(g_nCmdChannel,"occ|*|SAFEWORD|" + (string)wearer);
-        }
-
-        else if (num == DIALOG_RESPONSE)
-        {
-            if(id == g_keyDialogID)
+            if (kID == g_kMenuID)
             {
-                list menuparams = llParseString2List(str, ["|"], []);
-                key AV = (key)llList2String(menuparams, 0);
-                string message = llList2String(menuparams, 1);
-                integer page = (integer)llList2String(menuparams, 2);
-                integer iAuth = (integer)llList2String(menuparams, 3);
-                if (message == UPMENU)
+                //got a menu response meant for us, extract the values
+                list lMenuParams = llParseStringKeepNulls(sStr, ["|"], []);
+                Debug(sStr);
+
+                key kAv = (key)llList2String(lMenuParams, 0); // avatar using the menu
+                string sMessage = llList2String(lMenuParams, 1); // button label
+                integer iPage = (integer)llList2String(lMenuParams, 2); // menu page
+                integer iAuth = (integer)llList2String(lMenuParams, 3); // auth level of avatar
+                // request to switch to parent menu
+                if (sMessage == UPMENU)
                 {
-                    //give id the parent menu
-                    llMessageLinked(LINK_THIS, iAuth, "menu " + parentmenu, AV);
+                    //give av the parent menu
+                    llMessageLinked(LINK_THIS, iAuth, "menu "+g_sParentmenu, kAv);
                 }
-                else if (~llListFindList(localbuttons, [message]))
+                else if (~llListFindList(g_lLocalbuttons, [sMessage]))
                 {
                     //we got a response for something we handle locally
-                    if (message == "Upd. Colors")
+                    if (sMessage == "Upd. Colors")
                     {
                         // only send color values on demand
                         g_nRecolor=TRUE;
                         llMessageLinked(LINK_THIS, LM_SETTING_REQUEST, g_szPrefix+"colorsettings", NULL_KEY);
-                        DoMenu(AV, iAuth);
+                        // and restart the menu if wanted/needed
+                        DoMenu(kAv, iAuth);
                     }
-                    else if (message == "Upd. Textures")
+                    else if (sMessage == "Upd. Textures")
                     {
-                        Debug("Bing");
                         // only send texture values on demand
                         g_nRetexture=TRUE;
                         llMessageLinked(LINK_THIS, LM_SETTING_REQUEST, g_szPrefix+"textures", NULL_KEY);
-                        DoMenu(AV, iAuth);
-
+                        DoMenu(kAv, iAuth);
                     }
-                    else if (message == "Cuff Menu")
+                    else if (sMessage == "Cuff Menu")
                     {
                         // Send open command to cuff
-                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szCuffMenuCmd+"="+(string)AV+"|" +(string)wearer);
+                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szCuffMenuCmd+"="+(string)kAv+"|" +(string)g_kWearer+"|" +(string)iAuth);
                     }
-                    else if (message == "(Un)Lock Cuffs")
+                    else if (sMessage == "(Un)Lock Cuffs")
                     {
                         // action 2
-                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szSwitchLockCmd+"="+(string)AV+"|" +(string)wearer);
-                        DoMenu(AV, iAuth);
+                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szSwitchLockCmd+"="+(string)kAv+"|" +(string)g_kWearer+"|" +(string)iAuth);
+                        DoMenu(kAv, iAuth);
                     }
-                    else if (message == "Show/Hide")
+                    else if (sMessage == "Show/Hide")
                     {
                         // action 2
-                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szSwitchHideCmd+"|" +(string)wearer);
-                        DoMenu(AV, iAuth);
+                        Debug("Show/Hide");
+                        llRegionSay(g_nCmdChannel,"occ|rlac|"+g_szSwitchHideCmd+"|" +(string)g_kWearer+"|" +(string)iAuth);
+                        DoMenu(kAv, iAuth);
                     }
                 }
-                else if (message == "Sync On")
+                else if (sMessage == "Sync On")
                 {
                     // action 2
+                    Debug("Sync on");
                     g_nUpdateActive=!g_nUpdateActive;
                     llMessageLinked(LINK_THIS, LM_SETTING_SAVE, g_szPrefix+g_szUpdateActive_DBsave+"="+(string)g_nUpdateActive, NULL_KEY);
-                    DoMenu(AV, iAuth);
+                    DoMenu(kAv, iAuth);
                 }
-                else if (message == "Sync Off")
+                else if (sMessage == "Sync Off")
                 {
                     // action 2
+                    Debug("Sync off");
                     g_nUpdateActive=!g_nUpdateActive;
                     llMessageLinked(LINK_THIS, LM_SETTING_SAVE, g_szPrefix+g_szUpdateActive_DBsave+"="+(string)g_nUpdateActive, NULL_KEY);
-                    DoMenu(AV, iAuth);
+                    DoMenu(kAv, iAuth);
                 }
-                else if (~llListFindList(buttons, [message]))
+                else if (~llListFindList(g_lButtons, [sMessage]))
                 {
-                    //we got a submenu selection
-                    llMessageLinked(LINK_THIS, iAuth, "menu " + message, AV);
+                    //we got a button which another plugin put into into our menu
+                    llMessageLinked(LINK_THIS, iAuth, "menu "+ sMessage, kAv);
                 }
             }
         }
@@ -717,11 +739,9 @@ default
     {
         if (change & CHANGED_OWNER)
         {
-            wearer = llGetOwner();
+            g_kWearer = llGetOwner();
         }
     }
-
-
 }
 
 state WrongVersion
