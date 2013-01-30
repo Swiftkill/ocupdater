@@ -767,6 +767,9 @@ default
                     {
                         Notify(kAv, "Attempting to trigger the AO menu.  This will only work if " + llKey2Name(g_kWearer) + " is wearing the OpenCollar Sub AO.", FALSE);
                         AOMenu(kAv, iAuth);
+
+                        llWhisper(g_iInterfaceChannel, "CollarCommand|" + (string)iAuth + "|" + AO_MENU + "|" + (string)kAv);
+                        llWhisper(g_iAOChannel, AO_MENU + "|" + (string)kAv);
                         //llSay(g_iInterfaceChannel, AO_MENU + "|" + (string)kID);
                         //                llMessageLinked(LINK_SET, COMMAND_NOAUTH, "triggerao", kID);
                     }
